@@ -1,154 +1,708 @@
-#include <Arduino.h>
-#include <WiFi.h>
-#include <ESPmDNS.h>
-#include <WebServer.h>
-#include <ArduinoJson.h>
-#include <NimBLEDevice.h>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>ESP32 Locator (Bluetooth Only)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-// ==== WiFi CONFIG (placeholder for now) ====
-const char* WIFI_SSID     = "YOUR_WIFI_SSID";
-const char* WIFI_PASSWORD = "YOUR_WIFI_PASSWORD";
+  <style>
+    :root {
+      --bg: #050712;
+      --panel: #0b0f1b;
+      --accent: #32ffc1;
+      --accent-soft: rgba(50, 255, 193, 0.08);
+      --text: #f5f7ff;
+      --muted: #878aa3;
+      --border-soft: rgba(135, 138, 163, 0.3);
+    }
 
-// ==== BLE UUIDs ====
-static const char* SERVICE_UUID         = "7b2a0001-0000-4b8d-8f2d-000000000001";
-static const char* STATUS_CHAR_UUID     = "7b2a0002-0000-4b8d-8f2d-000000000001";
-static const char* CONTROL_CHAR_UUID    = "7b2a0003-0000-4b8d-8f2d-000000000001";
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text",
+                   "Segoe UI", sans-serif;
+    }
 
-WebServer server(80);
-bool wifiEnabled = false;
+    body {
+      background: radial-gradient(circle at top, #161930 0, #050712 55%, #020308 100%);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      padding: 20px 12px;
+    }
 
-// BLE globals
-NimBLEServer* pServer = nullptr;
-NimBLECharacteristic* pStatusChar = nullptr;
-NimBLECharacteristic* pControlChar = nullptr;
+    .shell {
+      width: 100%;
+      max-width: 1120px;
+      border-radius: 18px;
+      background: linear-gradient(135deg, rgba(50, 255, 193, 0.18), rgba(0, 0, 0, 0.7));
+      padding: 1px;
+      box-shadow: 0 34px 80px rgba(0, 0, 0, 0.8);
+    }
 
-// Forward declarations
-void setupWiFi();
-void setupHttpServer();
-String buildStatusJson();
+    .inner {
+      background: radial-gradient(circle at top left, #15182b 0, #050712 50%);
+      border-radius: 17px;
+      padding: 18px 16px 16px;
+    }
 
-class ControlCallbacks : public NimBLECharacteristicCallbacks {
-  void onWrite(NimBLECharacteristic* pCharacteristic) override {
-    std::string value = pCharacteristic->getValue();
-    if (value.empty()) return;
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+      margin-bottom: 18px;
+      flex-wrap: wrap;
+    }
 
-    if (value == "WIFI_ON") {
-      if (!wifiEnabled) {
-        wifiEnabled = true;
-        setupWiFi();
-        setupHttpServer();
+    .title-block h1 {
+      font-size: 22px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--accent);
+    }
+
+    .title-block p {
+      font-size: 13px;
+      color: var(--muted);
+      margin-top: 4px;
+      max-width: 420px;
+    }
+
+    .badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 6px;
+    }
+
+    .badge {
+      font-size: 11px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      padding: 3px 9px;
+      border-radius: 999px;
+      border: 1px solid rgba(135, 138, 163, 0.5);
+      color: var(--muted);
+      background: rgba(3, 7, 20, 0.9);
+    }
+
+    main {
+      display: grid;
+      grid-template-columns: minmax(0, 1.6fr) minmax(0, 1.4fr);
+      gap: 14px;
+    }
+
+    @media (max-width: 880px) {
+      main {
+        grid-template-columns: minmax(0, 1fr);
       }
-    } else if (value == "WIFI_OFF") {
-      if (wifiEnabled) {
-        wifiEnabled = false;
-        WiFi.disconnect(true);
-        WiFi.mode(WIFI_OFF);
+    }
+
+    .panel {
+      background: radial-gradient(circle at top, #171a2a 0, #050712 60%);
+      border-radius: 12px;
+      padding: 12px;
+      border: 1px solid rgba(135, 138, 163, 0.4);
+    }
+
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+      gap: 8px;
+    }
+
+    .panel-header h2 {
+      font-size: 13px;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .panel-header span {
+      font-size: 12px;
+      color: var(--accent);
+    }
+
+    button {
+      border: none;
+      border-radius: 999px;
+      padding: 8px 16px;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: transform 0.1s ease, box-shadow 0.1s ease, background 0.15s ease;
+      white-space: nowrap;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #020308;
+      box-shadow: 0 0 12px rgba(50, 255, 193, 0.7);
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 0 18px rgba(50, 255, 193, 0.9);
+    }
+
+    .btn-secondary {
+      background: rgba(135, 138, 163, 0.2);
+      color: var(--muted);
+    }
+
+    .btn-secondary:hover {
+      background: rgba(135, 138, 163, 0.3);
+    }
+
+    .map {
+      position: relative;
+      height: 360px;
+      border-radius: 10px;
+      border: 1px solid rgba(50, 255, 193, 0.35);
+      background: radial-gradient(circle at center, #11162a 0, #050712 70%);
+      overflow: hidden;
+    }
+
+    .map-grid {
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(135, 138, 163, 0.08) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(135, 138, 163, 0.08) 1px, transparent 1px);
+      background-size: 30px 30px;
+      pointer-events: none;
+      mix-blend-mode: screen;
+    }
+
+    .device-dot {
+      position: absolute;
+      width: 14px;
+      height: 14px;
+      border-radius: 999px;
+      background: var(--accent);
+      box-shadow: 0 0 14px rgba(50, 255, 193, 1);
+      transform: translate(-50%, -50%);
+      cursor: pointer;
+    }
+
+    .device-pulse {
+      position: absolute;
+      width: 32px;
+      height: 32px;
+      border-radius: 999px;
+      border: 1px solid rgba(50, 255, 193, 0.5);
+      transform: translate(-50%, -50%);
+      animation: pulse 2s infinite;
+      pointer-events: none;
+    }
+
+    .device-label {
+      position: absolute;
+      transform: translate(-50%, -145%);
+      background: rgba(3, 7, 20, 0.92);
+      border-radius: 999px;
+      padding: 3px 9px;
+      font-size: 11px;
+      border: 1px solid rgba(50, 255, 193, 0.6);
+      color: var(--text);
+      white-space: nowrap;
+    }
+
+    @keyframes pulse {
+      0% {
+        opacity: 0.8;
+        transform: translate(-50%, -50%) scale(0.7);
+      }
+      100% {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(1.4);
       }
     }
-  }
-};
 
-void setupWiFi() {
-  WiFi.mode(WIFI_STA);
-  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-
-  unsigned long start = millis();
-  while (WiFi.status() != WL_CONNECTED && millis() - start < 15000) {
-    delay(250);
-  }
-
-  if (WiFi.status() == WL_CONNECTED) {
-    if (MDNS.begin("esp32-locator")) {
-      // mDNS started
+    .device-info {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 8px;
     }
-  }
-}
 
-void handleStatus() {
-  String json = buildStatusJson();
-  server.send(200, "application/json", json);
-}
-
-void setupHttpServer() {
-  server.on("/status", HTTP_GET, handleStatus);
-  server.begin();
-}
-
-String buildStatusJson() {
-  StaticJsonDocument<256> doc;
-  doc["name"] = "ESP32-Locator";
-  doc["wifi"] = wifiEnabled;
-  doc["ip"] = (wifiEnabled && WiFi.status() == WL_CONNECTED)
-                ? WiFi.localIP().toString()
-                : "";
-  doc["rssi_wifi"] = (wifiEnabled && WiFi.status() == WL_CONNECTED)
-                ? WiFi.RSSI()
-                : 0;
-  doc["mac"] = WiFi.macAddress();
-  doc["timestamp"] = (uint32_t)(millis() / 1000);
-
-  String out;
-  serializeJson(doc, out);
-  return out;
-}
-
-void setupBLE() {
-  NimBLEDevice::init("ESP32-Locator");
-  NimBLEDevice::setPower(ESP_PWR_LVL_P7); // Tx power
-  NimBLEDevice::setSecurityAuth(false, false, true);
-
-  pServer = NimBLEDevice::createServer();
-
-  NimBLEService* pService = pServer->createService(SERVICE_UUID);
-
-  // STATUS characteristic (read/notify)
-  pStatusChar = pService->createCharacteristic(
-    STATUS_CHAR_UUID,
-    NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY
-  );
-
-  // CONTROL characteristic (write)
-  pControlChar = pService->createCharacteristic(
-    CONTROL_CHAR_UUID,
-    NIMBLE_PROPERTY::WRITE
-  );
-  pControlChar->setCallbacks(new ControlCallbacks());
-
-  pService->start();
-
-  NimBLEAdvertising* pAdvertising = NimBLEDevice::getAdvertising();
-  pAdvertising->addServiceUUID(SERVICE_UUID);
-  pAdvertising->setScanResponse(true);
-  pAdvertising->start();
-}
-
-void setup() {
-  Serial.begin(115200);
-  delay(500);
-
-  // Start BLE only; WiFi off by default
-  WiFi.mode(WIFI_OFF);
-  wifiEnabled = false;
-
-  setupBLE();
-}
-
-void loop() {
-  // If WiFi is enabled, keep HTTP server alive
-  if (wifiEnabled) {
-    server.handleClient();
-  }
-
-  // Periodically update status JSON over BLE
-  static unsigned long lastUpdate = 0;
-  if (millis() - lastUpdate > 2000) {
-    lastUpdate = millis();
-    if (pStatusChar) {
-      String status = buildStatusJson();
-      pStatusChar->setValue(status.c_str());
-      pStatusChar->notify();
+    .sidebar-section {
+      margin-bottom: 10px;
+      padding: 8px;
+      border-radius: 8px;
+      background: rgba(3, 7, 20, 0.8);
+      border: 1px solid rgba(135, 138, 163, 0.4);
     }
-  }
 
-  delay(10);
-}
+    .sidebar-section h3 {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.15em;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+
+    .sidebar-section p {
+      font-size: 11px;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+
+    .btn-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 4px;
+    }
+
+    .status-box {
+      font-size: 11px;
+      color: var(--muted);
+      padding: 7px 8px;
+      border-radius: 8px;
+      background: rgba(135, 138, 163, 0.12);
+      border: 1px solid rgba(135, 138, 163, 0.4);
+      margin-bottom: 6px;
+    }
+
+    .status-box.error {
+      color: #ff6b6b;
+      border-color: rgba(255, 107, 107, 0.7);
+      background: rgba(255, 107, 107, 0.08);
+    }
+
+    .device-list {
+      max-height: 160px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      margin-top: 4px;
+    }
+
+    .device-card {
+      background: rgba(3, 7, 20, 0.9);
+      border-radius: 8px;
+      padding: 6px 8px;
+      border: 1px solid rgba(135, 138, 163, 0.4);
+      font-size: 11px;
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .device-card-main {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .device-name {
+      font-weight: 600;
+    }
+
+    .device-meta {
+      color: var(--muted);
+      font-size: 10px;
+    }
+
+    .pill {
+      padding: 2px 7px;
+      border-radius: 999px;
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      border: 1px solid rgba(50, 255, 193, 0.7);
+      color: var(--accent);
+      background: var(--accent-soft);
+      flex-shrink: 0;
+    }
+
+    .code-box {
+      font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace;
+      font-size: 11px;
+      line-height: 1.4;
+      width: 100%;
+      min-height: 180px;
+      max-height: 260px;
+      padding: 8px;
+      border-radius: 8px;
+      border: 1px solid var(--border-soft);
+      background: rgba(3, 7, 20, 0.95);
+      color: var(--text);
+      resize: vertical;
+      white-space: pre-wrap;
+      overflow-y: auto;
+    }
+
+    .instructions {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 4px;
+      line-height: 1.5;
+    }
+
+    .instructions h4 {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.15em;
+      margin: 8px 0 3px;
+      color: var(--accent);
+    }
+
+    .instructions ol {
+      padding-left: 16px;
+      margin-bottom: 4px;
+    }
+
+    .instructions li {
+      margin-bottom: 2px;
+    }
+
+    footer {
+      margin-top: 10px;
+      font-size: 10px;
+      color: var(--muted);
+      display: flex;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <div class="inner">
+      <header>
+        <div class="title-block">
+          <h1>ESP32 Locator (Bluetooth Only)</h1>
+          <p>
+            This page connects to your ESP32 locator devices using Bluetooth only.
+            No WiFi is required. You can scan for devices, see them on the map,
+            and view their live status data.
+          </p>
+          <div class="badges">
+            <div class="badge">Static HTML</div>
+            <div class="badge">Bluetooth Only</div>
+          </div>
+        </div>
+      </header>
+
+      <main>
+        <!-- Left: Map and live data -->
+        <section class="panel">
+          <div class="panel-header">
+            <h2>Device map</h2>
+            <span id="deviceCountLabel">0 devices</span>
+          </div>
+          <div id="map" class="map">
+            <div class="map-grid"></div>
+          </div>
+          <div class="device-info" id="mapHint">
+            Click “Scan for ESP32” on the right to add devices to this map.
+          </div>
+
+          <div style="margin-top:10px;">
+            <div class="panel-header" style="margin-bottom:4px;">
+              <h2>Device data</h2>
+              <span>Live status JSON</span>
+            </div>
+            <textarea id="codeBox" class="code-box" readonly>
+Waiting for a device…
+
+When you connect to an ESP32-Locator, its live status will appear here.
+            </textarea>
+          </div>
+        </section>
+
+        <!-- Right: Controls and instructions -->
+        <section class="panel">
+          <div class="sidebar-section">
+            <h3>Bluetooth connection</h3>
+            <p>
+              This connects your browser directly to an ESP32 named
+              <strong>ESP32-Locator</strong> using Bluetooth. WiFi is not used.
+            </p>
+            <div class="btn-row">
+              <button class="btn-primary" id="scanButton">Scan for ESP32</button>
+              <button class="btn-secondary" id="disconnectAllButton">Disconnect all</button>
+            </div>
+            <div id="btStatus" class="status-box">
+              Web Bluetooth ready. Click “Scan for ESP32” to begin.
+            </div>
+
+            <div id="deviceList" class="device-list"></div>
+          </div>
+
+          <div class="sidebar-section">
+            <h3>How to use this page</h3>
+            <div class="instructions">
+              <h4>1. Prepare your ESP32</h4>
+              <ol>
+                <li>Flash your ESP32 with firmware that advertises as <strong>ESP32-Locator</strong>.</li>
+                <li>Make sure it exposes a Bluetooth service with a “status” characteristic.</li>
+              </ol>
+
+              <h4>2. Connect by Bluetooth</h4>
+              <ol>
+                <li>Turn on Bluetooth on your computer.</li>
+                <li>Click <strong>Scan for ESP32</strong>.</li>
+                <li>Choose the device named <strong>ESP32-Locator-…</strong> from the list.</li>
+              </ol>
+
+              <h4>3. See devices on the map</h4>
+              <ol>
+                <li>Each connected device appears as a glowing dot on the map.</li>
+                <li>Click a dot to show its status JSON in the box below.</li>
+              </ol>
+
+              <h4>4. Read live data</h4>
+              <ol>
+                <li>The device sends JSON over Bluetooth.</li>
+                <li>You can use this data to debug, explore, or integrate with other tools.</li>
+              </ol>
+
+              <h4>Troubleshooting</h4>
+              <ol>
+                <li>If you don’t see devices, move closer and scan again.</li>
+                <li>Make sure your browser supports Web Bluetooth (Chrome or Edge recommended).</li>
+              </ol>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <footer>
+        <div>All communication happens over Bluetooth. No WiFi connection is needed.</div>
+        <div>Best used in Chrome or Edge, over HTTPS or localhost, with Bluetooth enabled.</div>
+      </footer>
+    </div>
+  </div>
+
+  <script>
+    // ===== BLE UUIDs (must match your ESP32 firmware) =====
+    const SERVICE_UUID     = "7b2a0001-0000-4b8d-8f2d-000000000001";
+    const STATUS_CHAR_UUID = "7b2a0002-0000-4b8d-8f2d-000000000001";
+
+    // ===== DOM references =====
+    const mapEl = document.getElementById("map");
+    const deviceCountLabel = document.getElementById("deviceCountLabel");
+    const deviceListEl = document.getElementById("deviceList");
+    const btStatusEl = document.getElementById("btStatus");
+    const codeBoxEl = document.getElementById("codeBox");
+    const scanButton = document.getElementById("scanButton");
+    const disconnectAllButton = document.getElementById("disconnectAllButton");
+
+    // In-memory device state: id -> { device, server, statusChar, statusJson, x, y }
+    const devices = new Map();
+
+    function setBtStatus(text, isError = false) {
+      btStatusEl.textContent = text;
+      btStatusEl.classList.toggle("error", isError);
+    }
+
+    function updateDeviceCount() {
+      const n = devices.size;
+      deviceCountLabel.textContent = n === 1 ? "1 device" : `${n} devices`;
+    }
+
+    function randomMapPosition() {
+      const rect = mapEl.getBoundingClientRect();
+      const padding = 26;
+      const x = padding + Math.random() * (rect.width - 2 * padding);
+      const y = padding + Math.random() * (rect.height - 2 * padding);
+      return { x, y };
+    }
+
+    function prettifyJson(raw) {
+      try {
+        const obj = JSON.parse(raw);
+        return JSON.stringify(obj, null, 2);
+      } catch {
+        return raw;
+      }
+    }
+
+    function renderMapAndList() {
+      // Clear old map markers
+      const old = mapEl.querySelectorAll(".device-dot, .device-pulse, .device-label");
+      old.forEach(el => el.remove());
+
+      // Map dots
+      for (const [id, info] of devices) {
+        const { x, y, statusJson } = info;
+        let labelText = info.device.name || "ESP32-Locator";
+
+        if (statusJson) {
+          try {
+            const parsed = JSON.parse(statusJson);
+            if (parsed.name) labelText = parsed.name;
+          } catch {
+            // ignore
+          }
+        }
+
+        const dot = document.createElement("div");
+        dot.className = "device-dot";
+        dot.style.left = x + "px";
+        dot.style.top = y + "px";
+
+        const pulse = document.createElement("div");
+        pulse.className = "device-pulse";
+        pulse.style.left = x + "px";
+        pulse.style.top = y + "px";
+
+        const label = document.createElement("div");
+        label.className = "device-label";
+        label.style.left = x + "px";
+        label.style.top = y + "px";
+        label.textContent = labelText;
+
+        dot.addEventListener("click", () => {
+          if (info.statusJson) {
+            codeBoxEl.value = prettifyJson(info.statusJson);
+          } else {
+            codeBoxEl.value = "No status received yet from this device.";
+          }
+        });
+
+        mapEl.appendChild(pulse);
+        mapEl.appendChild(dot);
+        mapEl.appendChild(label);
+      }
+
+      // Device list
+      deviceListEl.innerHTML = "";
+      for (const [id, info] of devices) {
+        const card = document.createElement("div");
+        card.className = "device-card";
+
+        const main = document.createElement("div");
+        main.className = "device-card-main";
+
+        const nameEl = document.createElement("div");
+        nameEl.className = "device-name";
+        nameEl.textContent = info.device.name || "ESP32-Locator";
+
+        const metaEl = document.createElement("div");
+        metaEl.className = "device-meta";
+        const idShort = id ? id.slice(0, 8) + "…" : "unknown";
+        metaEl.textContent = `ID: ${idShort}`;
+
+        main.appendChild(nameEl);
+        main.appendChild(metaEl);
+
+        const pill = document.createElement("div");
+        pill.className = "pill";
+        pill.textContent = "Bluetooth";
+
+        card.appendChild(main);
+        card.appendChild(pill);
+        deviceListEl.appendChild(card);
+      }
+
+      updateDeviceCount();
+    }
+
+    async function handleScan() {
+      if (!navigator.bluetooth) {
+        setBtStatus("Web Bluetooth is not available in this browser.", true);
+        return;
+      }
+
+      try {
+        setBtStatus("Opening Bluetooth device chooser…");
+        const device = await navigator.bluetooth.requestDevice({
+          filters: [{ namePrefix: "ESP32-Locator" }],
+          optionalServices: [SERVICE_UUID]
+        });
+
+        const server = await device.gatt.connect();
+        const service = await server.getPrimaryService(SERVICE_UUID);
+        const statusChar = await service.getCharacteristic(STATUS_CHAR_UUID);
+
+        let info = devices.get(device.id);
+        if (!info) {
+          const { x, y } = randomMapPosition();
+          info = { device, server, statusChar, statusJson: null, x, y };
+          devices.set(device.id, info);
+        } else {
+          info.server = server;
+          info.statusChar = statusChar;
+        }
+
+        // initial read
+        try {
+          const value = await statusChar.readValue();
+          const text = new TextDecoder().decode(value);
+          info.statusJson = text;
+          codeBoxEl.value = prettifyJson(text);
+        } catch (err) {
+          console.warn("Could not read initial status:", err);
+        }
+
+        // notifications
+        statusChar.addEventListener("characteristicvaluechanged", event => {
+          const text = new TextDecoder().decode(event.target.value);
+          info.statusJson = text;
+          codeBoxEl.value = prettifyJson(text);
+          renderMapAndList();
+        });
+        await statusChar.startNotifications();
+
+        // disconnect handler
+        device.addEventListener("gattserverdisconnected", () => {
+          devices.delete(device.id);
+          setBtStatus("Device disconnected. Scan again to reconnect.");
+          renderMapAndList();
+        });
+
+        setBtStatus("Connected to " + (device.name || "ESP32-Locator") + ".");
+        renderMapAndList();
+      } catch (err) {
+        console.error(err);
+        if (err.name === "NotFoundError") {
+          setBtStatus("Scan cancelled. No device selected.");
+        } else {
+          setBtStatus("Bluetooth scan or connection failed. See console for details.", true);
+        }
+      }
+    }
+
+    function disconnectAll() {
+      for (const [, info] of devices) {
+        try {
+          if (info.server && info.server.connected) {
+            info.server.disconnect();
+          } else if (info.device && info.device.gatt && info.device.gatt.connected) {
+            info.device.gatt.disconnect();
+          }
+        } catch (err) {
+          console.warn("Error disconnecting device:", err);
+        }
+      }
+      devices.clear();
+      renderMapAndList();
+      setBtStatus("All devices disconnected.");
+    }
+
+    // Wire up
+    scanButton.addEventListener("click", handleScan);
+    disconnectAllButton.addEventListener("click", disconnectAll);
+
+    // Init
+    setBtStatus("Web Bluetooth ready. Click “Scan for ESP32” to begin.");
+    updateDeviceCount();
+  </script>
+</body>
+</html>
