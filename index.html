@@ -534,6 +534,65 @@
       color: var(--accent);
       text-decoration: none;
     }
+
+    /* QR modal */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+    }
+
+    .modal-content {
+      background: rgba(8, 10, 24, 0.98);
+      border-radius: 14px;
+      padding: 16px;
+      border: 1px solid rgba(50, 255, 193, 0.7);
+      max-width: 320px;
+      width: calc(100% - 32px);
+      text-align: center;
+    }
+
+    .modal-content h3 {
+      font-size: 14px;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 8px;
+    }
+
+    .modal-content p {
+      font-size: 11px;
+      color: var(--muted);
+      margin-bottom: 10px;
+    }
+
+    .qr-box {
+      background: #ffffff;
+      border-radius: 10px;
+      padding: 6px;
+      display: inline-block;
+      margin-bottom: 8px;
+    }
+
+    .qr-box img {
+      display: block;
+      max-width: 220px;
+      max-height: 220px;
+      width: 220px;
+      height: 220px;
+    }
+
+    .modal-actions {
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
   </style>
 </head>
 <body>
@@ -565,7 +624,6 @@
             <div class="map-grid"></div>
             <div class="map-center-dot"></div>
             <div class="map-center-label">You</div>
-            <!-- Radar dropdown injected here -->
           </div>
           <div class="device-info" id="radarHint">
             Click “Scan for items” to start adding items to your radar.
@@ -586,6 +644,27 @@ Some items may not send data. They will still appear on the radar with an estima
 
         <!-- Right: Controls and lists -->
         <section class="panel">
+          <!-- Connect phone (QR) and manual MAC connect -->
+          <div class="sidebar-section">
+            <h3>Connect your phone & manual connect</h3>
+            <p>
+              Share Item Oracle with your phone and record known MAC addresses
+              for your items. Your phone still needs Bluetooth support in the browser
+              to connect to items directly.
+            </p>
+            <div class="btn-row">
+              <button class="btn-secondary" id="showQrButton">Show QR code for this page</button>
+            </div>
+            <div class="category-row" style="margin-top:8px;">
+              <input id="macInput" class="inline-input" type="text" placeholder="Enter MAC (AA:BB:CC:DD:EE:FF)">
+              <button class="btn-secondary btn-small" id="macConnectButton">Save MAC</button>
+            </div>
+            <div id="macStatus" class="status-box">
+              Enter a MAC address to track a specific item. When Item Oracle sees a matching item,
+              you can rename it and organize it like any other item.
+            </div>
+          </div>
+
           <!-- Bluetooth + category filter -->
           <div class="sidebar-section">
             <h3>Scan and filter</h3>
@@ -721,14 +800,28 @@ Some items may not send data. They will still appear on the radar with an estima
     </div>
   </div>
 
+  <!-- QR Modal (hidden by default) -->
+  <div id="qrModal" class="modal-backdrop" style="display:none;">
+    <div class="modal-content">
+      <h3>Scan Item Oracle</h3>
+      <p>Point your phone camera at this code to open Item Oracle on your phone.</p>
+      <div class="qr-box">
+        <img id="qrImage" alt="Item Oracle QR code">
+      </div>
+      <p style="font-size:10px;">
+        This QR code only opens the page. Your phone will still ask for Bluetooth, notification, and sound permissions.
+      </p>
+      <div class="modal-actions">
+        <button class="btn-secondary btn-small" id="closeQrButton">Close</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     // ======== CONFIG / CONSTANTS ========
-    // If your items expose a custom BLE service with distance or status data,
-    // put those UUIDs here. Otherwise, the page will still work with
-    // approximate/random distance as a visual demo.
-    const CUSTOM_ITEM_SERVICE_UUID = null;  // e.g. "7b2a0001-0000-4b8d-8f2d-000000000001"
-    const CUSTOM_STATUS_CHAR_UUID  = null;  // optional status JSON
-    const CUSTOM_DISTANCE_CHAR_UUID = null; // optional distance in meters
+    const CUSTOM_ITEM_SERVICE_UUID = null;
+    const CUSTOM_STATUS_CHAR_UUID  = null;
+    const CUSTOM_DISTANCE_CHAR_UUID = null;
 
     const NEARBY_THRESHOLD_SECONDS = 4;
     const GETTING_FAR_SECONDS = 10;
@@ -759,10 +852,22 @@ Some items may not send data. They will still appear on the radar with an estima
     const soundOutOfRangeEl = document.getElementById("soundOutOfRange");
     const soundBackInRangeEl = document.getElementById("soundBackInRange");
 
+    const showQrButton = document.getElementById("showQrButton");
+    const qrModal = document.getElementById("qrModal");
+    const qrImage = document.getElementById("qrImage");
+    const closeQrButton = document.getElementById("closeQrButton");
+
+    const macInput = document.getElementById("macInput");
+    const macConnectButton = document.getElementById("macConnectButton");
+    const macStatusEl = document.getElementById("macStatus");
+
     // ======== STATE ========
     const items = new Map(); // id -> item
     const categories = new Set(["All Items", "Uncategorized"]);
     let selectedItemId = null;
+
+    // Keep a list of MAC addresses the user wants to track
+    const trackedMacs = new Set();
 
     const sounds = {
       unlocked: false,
@@ -914,7 +1019,6 @@ Some items may not send data. They will still appear on the radar with an estima
     }
 
     function renderRadarDropdown() {
-      // Remove any existing dropdown
       const oldDropdown = radarEl.querySelector(".radar-dropdown");
       if (oldDropdown) oldDropdown.remove();
 
@@ -987,7 +1091,6 @@ Some items may not send data. They will still appear on the radar with an estima
         renderAll();
       });
 
-      // Category dropdown inside dropdown
       const categorySelect = document.createElement("select");
       for (const cat of categories) {
         if (cat === "All Items") continue;
@@ -1001,486 +1104,4 @@ Some items may not send data. They will still appear on the radar with an estima
       }
       categorySelect.value = item.category;
       categorySelect.addEventListener("click", (ev) => ev.stopPropagation());
-      categorySelect.addEventListener("change", (ev) => {
-        ev.stopPropagation();
-        item.category = categorySelect.value || "Uncategorized";
-        renderAll();
-        renderRadarDropdown();
-      });
-
-      actions.appendChild(renameBtn);
-      actions.appendChild(removeBtn);
-      actions.appendChild(categorySelect);
-
-      dropdown.appendChild(actions);
-
-      // Position dropdown near item
-      const offsetX = item.x || rect.width / 2;
-      const offsetY = (item.y || rect.height / 2) - 40; // above the dot
-      dropdown.style.left = `${offsetX}px`;
-      dropdown.style.top = `${offsetY}px`;
-      dropdown.style.transform = "translate(-50%, -100%)";
-
-      radarEl.appendChild(dropdown);
-    }
-
-    // Close dropdown when clicking outside radar
-    document.addEventListener("click", (ev) => {
-      const dropdown = radarEl.querySelector(".radar-dropdown");
-      if (!dropdown) return;
-      if (radarEl.contains(ev.target)) {
-        // clicks inside radar are handled by item click handlers
-        return;
-      }
-      selectedItemId = null;
-      dropdown.remove();
-    });
-
-    // ======== ITEM LIST RENDERING ========
-    function renderItemList() {
-      itemListEl.innerHTML = "";
-      const visible = getVisibleItems();
-      if (!visible.length) {
-        const empty = document.createElement("div");
-        empty.style.fontSize = "11px";
-        empty.style.color = "var(--muted)";
-        empty.textContent = "No items connected yet. Click “Scan for items” above.";
-        itemListEl.appendChild(empty);
-        return;
-      }
-
-      for (const item of visible) {
-        const card = document.createElement("div");
-        card.className = "device-card";
-
-        const main = document.createElement("div");
-        main.className = "device-card-main";
-
-        const nameRow = document.createElement("div");
-        nameRow.className = "device-name-row";
-
-        const nameEl = document.createElement("div");
-        nameEl.className = "device-name";
-        nameEl.textContent = item.customName || item.btName || "Item";
-
-        const renameBtn = document.createElement("button");
-        renameBtn.className = "btn-secondary btn-small";
-        renameBtn.textContent = "Rename";
-        renameBtn.addEventListener("click", () => {
-          const newName = prompt("Enter a new name for this item:", item.customName || item.btName || "Item");
-          if (newName && newName.trim()) {
-            item.customName = newName.trim();
-            renderAll();
-          }
-        });
-
-        nameRow.appendChild(nameEl);
-        nameRow.appendChild(renameBtn);
-
-        const metaEl = document.createElement("div");
-        metaEl.className = "device-meta";
-
-        let distanceText = "Distance: unknown";
-        if (item.distanceFeet && isFinite(item.distanceFeet)) {
-          distanceText = `Distance: ~${Math.round(item.distanceFeet)} ft`;
-        }
-
-        metaEl.textContent = `${distanceText} · Category: ${item.category}`;
-
-        main.appendChild(nameRow);
-        main.appendChild(metaEl);
-
-        const rightCol = document.createElement("div");
-        rightCol.style.display = "flex";
-        rightCol.style.flexDirection = "column";
-        rightCol.style.alignItems = "flex-end";
-        rightCol.style.gap = "4px";
-
-        const pill = document.createElement("div");
-        pill.className = "pill";
-        let pillText = "Nearby";
-        if (item.status === "getting-far") {
-          pill.classList.add("pill-warning");
-          pillText = "Getting far";
-        } else if (item.status === "out-of-range") {
-          pill.classList.add("pill-danger");
-          pillText = "Out of range";
-        }
-        pill.textContent = pillText;
-
-        const categorySelect = document.createElement("select");
-        for (const cat of categories) {
-          if (cat === "All Items") continue;
-          const opt = document.createElement("option");
-          opt.value = cat;
-          opt.textContent = cat;
-          categorySelect.appendChild(opt);
-        }
-        if (!categories.has(item.category)) {
-          item.category = "Uncategorized";
-        }
-        categorySelect.value = item.category;
-        categorySelect.addEventListener("change", () => {
-          item.category = categorySelect.value || "Uncategorized";
-          renderAll();
-        });
-
-        const removeBtn = document.createElement("button");
-        removeBtn.className = "btn-danger btn-small";
-        removeBtn.textContent = "Remove";
-        removeBtn.addEventListener("click", () => {
-          try {
-            if (item.server && item.server.connected) {
-              item.server.disconnect();
-            } else if (item.device && item.device.gatt && item.device.gatt.connected) {
-              item.device.gatt.disconnect();
-            }
-          } catch {}
-          items.delete(item.id);
-          if (selectedItemId === item.id) {
-            selectedItemId = null;
-          }
-          renderAll();
-        });
-
-        // Clicking card selects item
-        card.addEventListener("click", () => {
-          selectedItemId = item.id;
-          focusItemInBox(item);
-          renderRadarDropdown();
-        });
-
-        rightCol.appendChild(pill);
-        rightCol.appendChild(categorySelect);
-        rightCol.appendChild(removeBtn);
-
-        card.appendChild(main);
-        card.appendChild(rightCol);
-        itemListEl.appendChild(card);
-      }
-    }
-
-    function renderAll() {
-      renderRadar();
-      renderItemList();
-      renderRadarDropdown();
-    }
-
-    // ======== NOTIFICATIONS ========
-    function requestNotificationPermissionIfNeeded() {
-      if (!enableNotificationsEl.checked) return;
-      if (!("Notification" in window)) {
-        alert("This browser does not support notifications.");
-        enableNotificationsEl.checked = false;
-        return;
-      }
-      if (Notification.permission === "granted") return;
-      if (Notification.permission === "denied") {
-        alert("Notifications are blocked for this site. Enable them in your browser settings to receive alerts.");
-        enableNotificationsEl.checked = false;
-        return;
-      }
-      Notification.requestPermission().then(result => {
-        if (result !== "granted") {
-          enableNotificationsEl.checked = false;
-        }
-      });
-    }
-
-    function sendNotification(title, body) {
-      if (!enableNotificationsEl.checked) return;
-      if (!("Notification" in window)) return;
-      if (Notification.permission !== "granted") return;
-      try {
-        new Notification(title, { body });
-      } catch (err) {
-        console.warn("Notification failed:", err);
-      }
-    }
-
-    function handleStatusChangeNotifications(item, oldStatus, newStatus) {
-      const name = item.customName || item.btName || "Item";
-      if (!enableNotificationsEl.checked) return;
-
-      if (oldStatus !== "getting-far" && newStatus === "getting-far" && notifyGettingFarEl.checked) {
-        sendNotification("Item Oracle Alert", `Your item “${name}” is getting far away.`);
-      } else if (newStatus === "out-of-range" && notifyOutOfRangeEl.checked && oldStatus !== "out-of-range") {
-        sendNotification("Item Oracle Alert", `Your item “${name}” is out of range.`);
-      } else if (newStatus === "nearby" && oldStatus !== "nearby" && notifyBackInRangeEl.checked) {
-        sendNotification("Item Oracle Update", `Your item “${name}” is nearby again.`);
-      }
-    }
-
-    // ======== SOUND ALERTS ========
-    function unlockSoundsIfNeeded() {
-      if (!enableSoundsEl.checked || sounds.unlocked) return;
-      try {
-        // Initialize Audio objects pointing to your sound files.
-        // Replace these with your real file paths.
-        sounds.connect = new Audio("connect.mp3");
-        sounds.gettingFar = new Audio("warning.mp3");
-        sounds.outOfRange = new Audio("alert.mp3");
-        sounds.backInRange = new Audio("return.mp3");
-
-        // Attempt a tiny, allowed play to "unlock" audio.
-        sounds.connect.volume = 0.0;
-        sounds.connect.play().catch(() => {});
-        sounds.unlocked = true;
-      } catch (err) {
-        console.warn("Could not initialize sound alerts:", err);
-        enableSoundsEl.checked = false;
-      }
-    }
-
-    function playSound(kind) {
-      if (!enableSoundsEl.checked || !sounds.unlocked) return;
-      try {
-        if (kind === "connect" && soundOnConnectEl.checked && sounds.connect) {
-          sounds.connect.volume = 1.0;
-          sounds.connect.play().catch(() => {});
-        } else if (kind === "getting-far" && soundGettingFarEl.checked && sounds.gettingFar) {
-          sounds.gettingFar.play().catch(() => {});
-        } else if (kind === "out-of-range" && soundOutOfRangeEl.checked && sounds.outOfRange) {
-          sounds.outOfRange.play().catch(() => {});
-        } else if (kind === "back-in-range" && soundBackInRangeEl.checked && sounds.backInRange) {
-          sounds.backInRange.play().catch(() => {});
-        }
-      } catch (err) {
-        console.warn("Sound play failed:", err);
-      }
-    }
-
-    function handleStatusChangeSounds(item, oldStatus, newStatus) {
-      if (!enableSoundsEl.checked) return;
-
-      if (oldStatus !== "getting-far" && newStatus === "getting-far") {
-        playSound("getting-far");
-      } else if (newStatus === "out-of-range" && oldStatus !== "out-of-range") {
-        playSound("out-of-range");
-      } else if (newStatus === "nearby" && oldStatus !== "nearby") {
-        playSound("back-in-range");
-      }
-    }
-
-    // ======== STATUS UPDATER ========
-    function updateItemStatuses() {
-      const now = Date.now();
-      for (const [, item] of items) {
-        const seconds = (now - item.lastSeen) / 1000;
-        let newStatus;
-        if (seconds <= NEARBY_THRESHOLD_SECONDS) {
-          newStatus = "nearby";
-        } else if (seconds <= GETTING_FAR_SECONDS) {
-          newStatus = "getting-far";
-        } else if (seconds >= OUT_OF_RANGE_SECONDS) {
-          newStatus = "out-of-range";
-        } else {
-          newStatus = "getting-far";
-        }
-
-        if (newStatus !== item.status) {
-          const oldStatus = item.status;
-          item.status = newStatus;
-          handleStatusChangeNotifications(item, oldStatus, newStatus);
-          handleStatusChangeSounds(item, oldStatus, newStatus);
-        }
-      }
-      renderAll();
-    }
-
-    // ======== BLUETOOTH SCAN ========
-    async function handleScan() {
-      if (!navigator.bluetooth) {
-        setBtStatus("Web Bluetooth is not available in this browser.", true);
-        return;
-      }
-
-      try {
-        setBtStatus("Opening Bluetooth chooser…");
-        const options = {
-          acceptAllDevices: true
-        };
-        if (CUSTOM_ITEM_SERVICE_UUID) {
-          options.optionalServices = [CUSTOM_ITEM_SERVICE_UUID];
-        }
-
-        const device = await navigator.bluetooth.requestDevice(options);
-        const id = device.id || (device.name || "Item") + "#" + Math.random().toString(16).slice(2);
-        const server = await device.gatt.connect();
-
-        let statusChar = null;
-        let distanceChar = null;
-
-        if (CUSTOM_ITEM_SERVICE_UUID && CUSTOM_STATUS_CHAR_UUID) {
-          try {
-            const service = await server.getPrimaryService(CUSTOM_ITEM_SERVICE_UUID);
-            statusChar = await service.getCharacteristic(CUSTOM_STATUS_CHAR_UUID);
-          } catch (err) {
-            console.warn("Custom status characteristic not available on this item.", err);
-          }
-        }
-
-        if (CUSTOM_ITEM_SERVICE_UUID && CUSTOM_DISTANCE_CHAR_UUID) {
-          try {
-            const service = await server.getPrimaryService(CUSTOM_ITEM_SERVICE_UUID);
-            distanceChar = await service.getCharacteristic(CUSTOM_DISTANCE_CHAR_UUID);
-          } catch (err) {
-            console.warn("Custom distance characteristic not available on this item.", err);
-          }
-        }
-
-        let item = items.get(id);
-        if (!item) {
-          item = {
-            id,
-            device,
-            server,
-            statusChar,
-            distanceChar,
-            btName: device.name || "Unnamed Item",
-            customName: null,
-            category: "Uncategorized",
-            distanceFeet: null,
-            lastSeen: Date.now(),
-            status: "nearby",
-            angleRad: hashToAngle(id),
-            x: null,
-            y: null
-          };
-          items.set(id, item);
-        } else {
-          item.server = server;
-          item.statusChar = statusChar;
-          item.distanceChar = distanceChar;
-          item.lastSeen = Date.now();
-          item.status = "nearby";
-        }
-
-        // default distance if nothing else
-        if (item.distanceFeet == null) {
-          item.distanceFeet = 15 + Math.random() * 25;
-        }
-
-        // read initial status JSON if available
-        if (statusChar) {
-          try {
-            const value = await statusChar.readValue();
-            const text = new TextDecoder().decode(value);
-            dataBoxEl.value = prettifyJson(text);
-            item.lastSeen = Date.now();
-          } catch (err) {
-            console.warn("Could not read initial status from item.", err);
-          }
-
-          statusChar.addEventListener("characteristicvaluechanged", event => {
-            const text = new TextDecoder().decode(event.target.value);
-            dataBoxEl.value = prettifyJson(text);
-            item.lastSeen = Date.now();
-          });
-          try {
-            await statusChar.startNotifications();
-          } catch (err) {
-            console.warn("Could not start notifications for status characteristic.", err);
-          }
-        }
-
-        // distance updates from a characteristic (if your item supports it)
-        if (distanceChar) {
-          distanceChar.addEventListener("characteristicvaluechanged", event => {
-            const dv = event.target.value;
-            const meters = dv.getFloat32(0, true);
-            if (isFinite(meters) && meters > 0) {
-              const feet = meters * 3.28084;
-              item.distanceFeet = feet;
-              item.lastSeen = Date.now();
-            }
-          });
-          try {
-            await distanceChar.startNotifications();
-          } catch (err) {
-            console.warn("Could not start notifications for distance characteristic.", err);
-          }
-        }
-
-        device.addEventListener("gattserverdisconnected", () => {
-          const existing = items.get(id);
-          if (existing) {
-            const oldStatus = existing.status;
-            existing.status = "out-of-range";
-            handleStatusChangeNotifications(existing, oldStatus, "out-of-range");
-            handleStatusChangeSounds(existing, oldStatus, "out-of-range");
-            renderAll();
-          }
-        });
-
-        // Sound for connect (with approval)
-        playSound("connect");
-
-        setBtStatus("Connected to item: " + (item.customName || item.btName) + ".");
-        renderAll();
-      } catch (err) {
-        console.error(err);
-        if (err.name === "NotFoundError") {
-          setBtStatus("Scan cancelled. No item selected.");
-        } else {
-          setBtStatus("Bluetooth scan or connection failed. See console for details.", true);
-        }
-      }
-    }
-
-    function disconnectAll() {
-      for (const [, item] of items) {
-        try {
-          if (item.server && item.server.connected) {
-            item.server.disconnect();
-          } else if (item.device && item.device.gatt && item.device.gatt.connected) {
-            item.device.gatt.disconnect();
-          }
-        } catch (err) {
-          console.warn("Error disconnecting item:", err);
-        }
-      }
-      items.clear();
-      selectedItemId = null;
-      renderAll();
-      setBtStatus("All items disconnected.");
-    }
-
-    // ======== EVENT WIRING ========
-    scanButton.addEventListener("click", handleScan);
-    disconnectAllButton.addEventListener("click", disconnectAll);
-
-    categoryFilterEl.addEventListener("change", () => {
-      renderAll();
-    });
-
-    addCategoryButton.addEventListener("click", () => {
-      const name = newCategoryInput.value.trim();
-      if (!name) return;
-      if (!categories.has(name)) {
-        categories.add(name);
-        ensureCategoryOptions();
-      }
-      newCategoryInput.value = "";
-    });
-
-    enableNotificationsEl.addEventListener("change", () => {
-      if (enableNotificationsEl.checked) {
-        requestNotificationPermissionIfNeeded();
-      }
-    });
-
-    enableSoundsEl.addEventListener("change", () => {
-      if (enableSoundsEl.checked) {
-        unlockSoundsIfNeeded();
-      }
-    });
-
-    // ======== INITIALIZE ========
-    setBtStatus("Web Bluetooth ready. Click “Scan for items” to begin.");
-    ensureCategoryOptions();
-    renderAll();
-    setInterval(updateItemStatuses, 2000);
-  </script>
-</body>
-</html>
+      categorySelect.addEventListener("change", (ev
