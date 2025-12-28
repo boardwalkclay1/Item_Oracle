@@ -1484,3 +1484,1383 @@ Some items may not send data. They will still appear on the radar with an estima
   </script>
 </body>
 </html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Item Oracle</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <style>
+    :root {
+      --bg: #050712;
+      --panel: #0b0f1b;
+      --accent: #32ffc1;
+      --accent-soft: rgba(50, 255, 193, 0.08);
+      --text: #f5f7ff;
+      --muted: #878aa3;
+      --border-soft: rgba(135, 138, 163, 0.3);
+      --danger: #ff6b6b;
+      --warning: #ffb347;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text",
+                   "Segoe UI", sans-serif;
+    }
+
+    body {
+      background: radial-gradient(circle at top, #161930 0, #050712 55%, #020308 100%);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      padding: 20px 12px;
+    }
+
+    .shell {
+      width: 100%;
+      max-width: 1160px;
+      border-radius: 18px;
+      background: linear-gradient(135deg, rgba(50, 255, 193, 0.18), rgba(0, 0, 0, 0.7));
+      padding: 1px;
+      box-shadow: 0 34px 80px rgba(0, 0, 0, 0.8);
+    }
+
+    .inner {
+      background: radial-gradient(circle at top left, #15182b 0, #050712 50%);
+      border-radius: 17px;
+      padding: 18px 16px 16px;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+      margin-bottom: 18px;
+      flex-wrap: wrap;
+    }
+
+    .title-block h1 {
+      font-size: 22px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--accent);
+    }
+
+    .title-block p {
+      font-size: 13px;
+      color: var(--muted);
+      margin-top: 4px;
+      max-width: 460px;
+    }
+
+    .badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 6px;
+    }
+
+    .badge {
+      font-size: 11px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      padding: 3px 9px;
+      border-radius: 999px;
+      border: 1px solid rgba(135, 138, 163, 0.5);
+      color: var(--muted);
+      background: rgba(3, 7, 20, 0.9);
+    }
+
+    main {
+      display: grid;
+      grid-template-columns: minmax(0, 1.7fr) minmax(0, 1.3fr);
+      gap: 14px;
+    }
+
+    @media (max-width: 880px) {
+      main {
+        grid-template-columns: minmax(0, 1fr);
+      }
+    }
+
+    .panel {
+      background: radial-gradient(circle at top, #171a2a 0, #050712 60%);
+      border-radius: 12px;
+      padding: 12px;
+      border: 1px solid rgba(135, 138, 163, 0.4);
+    }
+
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+      gap: 8px;
+    }
+
+    .panel-header h2 {
+      font-size: 13px;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .panel-header span {
+      font-size: 12px;
+      color: var(--accent);
+    }
+
+    button {
+      border: none;
+      border-radius: 999px;
+      padding: 8px 14px;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: transform 0.1s ease, box-shadow 0.1s ease, background 0.15s ease, opacity 0.15s ease;
+      white-space: nowrap;
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: default;
+      box-shadow: none;
+      transform: none;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #020308;
+      box-shadow: 0 0 12px rgba(50, 255, 193, 0.7);
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      transform: translateY(-1px);
+      box-shadow: 0 0 18px rgba(50, 255, 193, 0.9);
+    }
+
+    .btn-secondary {
+      background: rgba(135, 138, 163, 0.2);
+      color: var(--muted);
+    }
+
+    .btn-secondary:hover:not(:disabled) {
+      background: rgba(135, 138, 163, 0.3);
+    }
+
+    .btn-danger {
+      background: rgba(255, 107, 107, 0.1);
+      color: var(--danger);
+      border: 1px solid rgba(255, 107, 107, 0.5);
+    }
+
+    .btn-danger:hover:not(:disabled) {
+      background: rgba(255, 107, 107, 0.18);
+    }
+
+    .btn-small {
+      padding: 5px 10px;
+      font-size: 10px;
+    }
+
+    .map {
+      position: relative;
+      height: 380px;
+      border-radius: 10px;
+      border: 1px solid rgba(50, 255, 193, 0.35);
+      background: radial-gradient(circle at center, #11162a 0, #050712 70%);
+      overflow: hidden;
+    }
+
+    .map-grid {
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(135, 138, 163, 0.08) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(135, 138, 163, 0.08) 1px, transparent 1px);
+      background-size: 30px 30px;
+      pointer-events: none;
+      mix-blend-mode: screen;
+    }
+
+    .map-center-dot {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      background: #ffffff;
+      box-shadow: 0 0 10px rgba(255, 255, 255, 0.9);
+      transform: translate(-50%, -50%);
+    }
+
+    .map-center-label {
+      position: absolute;
+      left: 50%;
+      top: calc(50% + 14px);
+      transform: translate(-50%, 0);
+      font-size: 10px;
+      color: var(--muted);
+    }
+
+    .item-dot {
+      position: absolute;
+      width: 14px;
+      height: 14px;
+      border-radius: 999px;
+      background: var(--accent);
+      box-shadow: 0 0 14px rgba(50, 255, 193, 1);
+      transform: translate(-50%, -50%);
+      cursor: pointer;
+    }
+
+    .item-pulse {
+      position: absolute;
+      width: 32px;
+      height: 32px;
+      border-radius: 999px;
+      border: 1px solid rgba(50, 255, 193, 0.5);
+      transform: translate(-50%, -50%);
+      animation: pulse 2s infinite;
+      pointer-events: none;
+    }
+
+    .item-label {
+      position: absolute;
+      transform: translate(-50%, -145%);
+      background: rgba(3, 7, 20, 0.92);
+      border-radius: 999px;
+      padding: 3px 9px;
+      font-size: 11px;
+      border: 1px solid rgba(50, 255, 193, 0.6);
+      color: var(--text);
+      white-space: nowrap;
+      cursor: pointer;
+    }
+
+    @keyframes pulse {
+      0% {
+        opacity: 0.8;
+        transform: translate(-50%, -50%) scale(0.7);
+      }
+      100% {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(1.4);
+      }
+    }
+
+    .radar-dropdown {
+      position: absolute;
+      min-width: 190px;
+      max-width: 220px;
+      background: rgba(3, 7, 20, 0.98);
+      border-radius: 10px;
+      border: 1px solid rgba(50, 255, 193, 0.7);
+      padding: 8px 9px;
+      font-size: 11px;
+      z-index: 20;
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.7);
+    }
+
+    .radar-dropdown h4 {
+      font-size: 12px;
+      font-weight: 600;
+      margin-bottom: 4px;
+      color: var(--accent);
+    }
+
+    .radar-dropdown-row {
+      margin-bottom: 3px;
+      color: var(--muted);
+    }
+
+    .radar-dropdown-row span {
+      color: var(--text);
+    }
+
+    .radar-dropdown-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      margin-top: 6px;
+    }
+
+    .device-info {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 8px;
+    }
+
+    .sidebar-section {
+      margin-bottom: 10px;
+      padding: 8px;
+      border-radius: 8px;
+      background: rgba(3, 7, 20, 0.8);
+      border: 1px solid rgba(135, 138, 163, 0.4);
+    }
+
+    .sidebar-section h3 {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.15em;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+
+    .sidebar-section p {
+      font-size: 11px;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+
+    .btn-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 4px;
+    }
+
+    .status-box {
+      font-size: 11px;
+      color: var(--muted);
+      padding: 7px 8px;
+      border-radius: 8px;
+      background: rgba(135, 138, 163, 0.12);
+      border: 1px solid rgba(135, 138, 163, 0.4);
+      margin-top: 6px;
+    }
+
+    .status-box.error {
+      color: var(--danger);
+      border-color: rgba(255, 107, 107, 0.7);
+      background: rgba(255, 107, 107, 0.08);
+    }
+
+    .status-box span {
+      color: var(--accent);
+    }
+
+    .device-list {
+      max-height: 180px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      margin-top: 4px;
+    }
+
+    .device-card {
+      background: rgba(3, 7, 20, 0.9);
+      border-radius: 8px;
+      padding: 6px 8px;
+      border: 1px solid rgba(135, 138, 163, 0.4);
+      font-size: 11px;
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .device-card-main {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      flex: 1;
+      min-width: 0;
+    }
+
+    .device-name-row {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .device-name {
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .device-meta {
+      color: var(--muted);
+      font-size: 10px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .pill {
+      padding: 2px 7px;
+      border-radius: 999px;
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      border: 1px solid rgba(50, 255, 193, 0.7);
+      color: var(--accent);
+      background: var(--accent-soft);
+      flex-shrink: 0;
+    }
+
+    .pill-warning {
+      border-color: var(--warning);
+      color: var(--warning);
+      background: rgba(255, 179, 71, 0.1);
+    }
+
+    .pill-danger {
+      border-color: var(--danger);
+      color: var(--danger);
+      background: rgba(255, 107, 107, 0.1);
+    }
+
+    .code-box {
+      font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace;
+      font-size: 11px;
+      line-height: 1.4;
+      width: 100%;
+      min-height: 150px;
+      max-height: 220px;
+      padding: 8px;
+      border-radius: 8px;
+      border: 1px solid var(--border-soft);
+      background: rgba(3, 7, 20, 0.95);
+      color: var(--text);
+      resize: vertical;
+      white-space: pre-wrap;
+      overflow-y: auto;
+    }
+
+    .instructions {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 4px;
+      line-height: 1.5;
+    }
+
+    .instructions h4 {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.15em;
+      margin: 8px 0 3px;
+      color: var(--accent);
+    }
+
+    .instructions ol {
+      padding-left: 16px;
+      margin-bottom: 4px;
+    }
+
+    .instructions li {
+      margin-bottom: 2px;
+    }
+
+    .category-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 4px;
+    }
+
+    select {
+      border-radius: 999px;
+      border: 1px solid var(--border-soft);
+      padding: 4px 8px;
+      background: rgba(4, 7, 20, 0.95);
+      color: var(--text);
+      font-size: 11px;
+    }
+
+    .inline-input {
+      border-radius: 6px;
+      border: 1px solid var(--border-soft);
+      padding: 3px 6px;
+      background: rgba(4, 7, 20, 0.95);
+      color: var(--text);
+      font-size: 11px;
+      min-width: 0;
+    }
+
+    .switch-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 4px;
+    }
+
+    .switch-row input {
+      cursor: pointer;
+    }
+
+    footer {
+      margin-top: 10px;
+      font-size: 10px;
+      color: var(--muted);
+      display: flex;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+    }
+
+    .modal-content {
+      background: rgba(8, 10, 24, 0.98);
+      border-radius: 14px;
+      padding: 16px;
+      border: 1px solid rgba(50, 255, 193, 0.7);
+      max-width: 320px;
+      width: calc(100% - 32px);
+      text-align: center;
+    }
+
+    .modal-content h3 {
+      font-size: 14px;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 8px;
+    }
+
+    .modal-content p {
+      font-size: 11px;
+      color: var(--muted);
+      margin-bottom: 10px;
+    }
+
+    .qr-box {
+      background: #ffffff;
+      border-radius: 10px;
+      padding: 6px;
+      display: inline-block;
+      margin-bottom: 8px;
+    }
+
+    .qr-box img {
+      display: block;
+      max-width: 220px;
+      max-height: 220px;
+      width: 220px;
+      height: 220px;
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <div class="inner">
+      <header>
+        <div class="title-block">
+          <h1>Item Oracle</h1>
+          <p>
+            Item Oracle lets you connect to nearby Bluetooth items, see them on a radar,
+            rename them, group them into categories, and get alerts when you move away from them.
+          </p>
+          <div class="badges">
+            <div class="badge">Bluetooth Only</div>
+            <div class="badge">Static Site</div>
+            <div class="badge">Item Radar</div>
+          </div>
+        </div>
+      </header>
+
+      <main>
+        <!-- Left: Radar and live data -->
+        <section class="panel">
+          <div class="panel-header">
+            <h2>Item radar</h2>
+            <span id="itemCountLabel">0 items</span>
+          </div>
+          <div id="radar" class="map">
+            <div class="map-grid"></div>
+            <div class="map-center-dot"></div>
+            <div class="map-center-label">You</div>
+          </div>
+          <div class="device-info" id="radarHint">
+            Click “Scan for items” to start adding items to your radar.
+          </div>
+
+          <div style="margin-top:10px;">
+            <div class="panel-header" style="margin-bottom:4px;">
+              <h2>Item data</h2>
+              <span>Live details from your items</span>
+            </div>
+            <textarea id="dataBox" class="code-box" readonly>
+Select an item on the radar or in the list to see its data here.
+
+Some items may not send data. They will still appear on the radar with an estimated distance.
+            </textarea>
+          </div>
+        </section>
+
+        <!-- Right: Controls and lists -->
+        <section class="panel">
+
+          <!-- Connect phone (QR) and manual MAC connect -->
+          <div class="sidebar-section">
+            <h3>Connect your phone & manual connect</h3>
+            <p>
+              Share Item Oracle with your phone and record known MAC addresses
+              for your items. Your phone will still ask for Bluetooth, notification,
+              and sound permissions when needed.
+            </p>
+            <div class="btn-row">
+              <button class="btn-secondary" id="showQrButton">Show QR code for this page</button>
+            </div>
+            <div class="category-row" style="margin-top:8px;">
+              <input id="macInput" class="inline-input" type="text"
+                     placeholder="Enter MAC (AA:BB:CC:DD:EE:FF)">
+              <button class="btn-secondary btn-small" id="macAddButton">Save MAC</button>
+            </div>
+            <div id="macStatus" class="status-box">
+              Enter a MAC address to track a specific item. When Item Oracle sees a matching item,
+              you can rename it and organize it like any other item.
+            </div>
+            <div id="macList" class="device-list" style="max-height:110px;margin-top:4px;"></div>
+          </div>
+
+          <!-- Scan + category filter (UI only; your Bluetooth logic goes behind these) -->
+          <div class="sidebar-section">
+            <h3>Scan and filter</h3>
+            <p>
+              Scan for nearby Bluetooth items, then filter by category. All items are listed under
+              “All Items” automatically. You can rename items and move them into custom categories.
+            </p>
+            <div class="btn-row">
+              <button class="btn-primary" id="scanButton">Scan for items</button>
+              <button class="btn-secondary" id="disconnectAllButton">Disconnect all</button>
+            </div>
+            <div class="category-row">
+              <label style="font-size:11px;color:var(--muted);">Category view:</label>
+              <select id="categoryFilter">
+                <option value="All Items">All Items</option>
+                <option value="Uncategorized">Uncategorized</option>
+              </select>
+            </div>
+            <div class="category-row" style="margin-top:6px;">
+              <input id="newCategoryInput" class="inline-input" type="text" placeholder="New category name">
+              <button class="btn-secondary btn-small" id="addCategoryButton">Add category</button>
+            </div>
+            <div id="btStatus" class="status-box">
+              Web Bluetooth ready. Click <span>Scan for items</span> to begin.
+            </div>
+          </div>
+
+          <!-- Notifications UI (wire into your existing notification logic if you have it) -->
+          <div class="sidebar-section">
+            <h3>Notifications</h3>
+            <p>
+              Item Oracle can send alerts when you start moving away from an item
+              or when it goes completely out of range. Notifications only start
+              after you explicitly allow them.
+            </p>
+            <div class="switch-row">
+              <input type="checkbox" id="enableNotifications">
+              <label for="enableNotifications">Enable notifications for Item Oracle</label>
+            </div>
+            <div class="switch-row">
+              <input type="checkbox" id="notifyGettingFar" checked>
+              <label for="notifyGettingFar">Alert when items are getting far</label>
+            </div>
+            <div class="switch-row">
+              <input type="checkbox" id="notifyOutOfRange" checked>
+              <label for="notifyOutOfRange">Alert when items are out of range</label>
+            </div>
+            <div class="switch-row">
+              <input type="checkbox" id="notifyBackInRange" checked>
+              <label for="notifyBackInRange">Alert when items come back</label>
+            </div>
+          </div>
+
+          <!-- Sound settings UI -->
+          <div class="sidebar-section">
+            <h3>Sound alerts</h3>
+            <p>
+              You can also let Item Oracle play sounds when items connect, get far, go out of range,
+              or come back. Sound only plays after you tap to enable it.
+            </p>
+            <div class="switch-row">
+              <input type="checkbox" id="enableSounds">
+              <label for="enableSounds">Enable sound alerts</label>
+            </div>
+            <div class="switch-row">
+              <input type="checkbox" id="soundOnConnect" checked>
+              <label for="soundOnConnect">Sound when item connects</label>
+            </div>
+            <div class="switch-row">
+              <input type="checkbox" id="soundGettingFar" checked>
+              <label for="soundGettingFar">Sound when items are getting far</label>
+            </div>
+            <div class="switch-row">
+              <input type="checkbox" id="soundOutOfRange" checked>
+              <label for="soundOutOfRange">Sound when items are out of range</label>
+            </div>
+            <div class="switch-row">
+              <input type="checkbox" id="soundBackInRange" checked>
+              <label for="soundBackInRange">Sound when items come back</label>
+            </div>
+          </div>
+
+          <!-- Item list -->
+          <div class="sidebar-section">
+            <h3>Items</h3>
+            <p style="margin-bottom:4px;">
+              Each connected Bluetooth item appears here. You can rename items, change their category,
+              and see their estimated distance. Names you set here also appear on the radar.
+            </p>
+            <div id="itemList" class="device-list"></div>
+          </div>
+
+          <!-- Instructions -->
+          <div class="sidebar-section">
+            <h3>How Item Oracle works</h3>
+            <div class="instructions">
+              <h4>1. Scan for items</h4>
+              <ol>
+                <li>Turn on Bluetooth on your computer or phone.</li>
+                <li>Click <strong>Scan for items</strong>.</li>
+                <li>Select one or more items from the list that appears.</li>
+              </ol>
+
+              <h4>2. See items on the radar</h4>
+              <ol>
+                <li>Connected items appear as glowing dots around you.</li>
+                <li>The distance in feet is an estimate based on Bluetooth signal or your item’s data.</li>
+                <li>Click a dot or list entry to see details.</li>
+              </ol>
+
+              <h4>3. Rename and organize</h4>
+              <ol>
+                <li>Use the rename button to give items clear names, like “Keys” or “Backpack”.</li>
+                <li>Add categories like “Everyday Carry” or “Travel” and assign items to them.</li>
+                <li>The radar and list can be filtered by category.</li>
+              </ol>
+
+              <h4>4. Approvals, alerts, and sound</h4>
+              <ol>
+                <li>Turn on notifications to allow alerts from Item Oracle.</li>
+                <li>Turn on sound alerts if you want tones when items move away or come back.</li>
+                <li>You can change these choices at any time.</li>
+              </ol>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <footer>
+        <div>Item Oracle runs completely in your browser using Bluetooth. No WiFi is required.</div>
+        <div>Use in Chrome or Edge, over HTTPS or localhost, with Bluetooth, notifications, and sound enabled if you choose.</div>
+      </footer>
+    </div>
+  </div>
+
+  <!-- QR Modal -->
+  <div id="qrModal" class="modal-backdrop" style="display:none;">
+    <div class="modal-content">
+      <h3>Scan Item Oracle</h3>
+      <p>Point your phone camera at this code to open Item Oracle on your phone.</p>
+      <div class="qr-box">
+        <img id="qrImage" alt="Item Oracle QR code">
+      </div>
+      <p style="font-size:10px;">
+        This QR code only opens the page. Your phone will still ask for
+        Bluetooth, notification, and sound permissions.
+      </p>
+      <div class="modal-actions">
+        <button class="btn-secondary btn-small" id="closeQrButton">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ======== BASIC UI STATE (non-Bluetooth) ========
+
+    const radarEl = document.getElementById("radar");
+    const itemCountLabel = document.getElementById("itemCountLabel");
+    const itemListEl = document.getElementById("itemList");
+    const btStatusEl = document.getElementById("btStatus");
+    const dataBoxEl = document.getElementById("dataBox");
+
+    const categoryFilterEl = document.getElementById("categoryFilter");
+    const newCategoryInput = document.getElementById("newCategoryInput");
+    const addCategoryButton = document.getElementById("addCategoryButton");
+
+    // Notifications toggles (wire into your existing logic if you have it)
+    const enableNotificationsEl = document.getElementById("enableNotifications");
+    const notifyGettingFarEl = document.getElementById("notifyGettingFar");
+    const notifyOutOfRangeEl = document.getElementById("notifyOutOfRange");
+    const notifyBackInRangeEl = document.getElementById("notifyBackInRange");
+
+    // Sounds toggles (wire into your existing logic if you have it)
+    const enableSoundsEl = document.getElementById("enableSounds");
+    const soundOnConnectEl = document.getElementById("soundOnConnect");
+    const soundGettingFarEl = document.getElementById("soundGettingFar");
+    const soundOutOfRangeEl = document.getElementById("soundOutOfRange");
+    const soundBackInRangeEl = document.getElementById("soundBackInRange");
+
+    // QR + MAC elements
+    const showQrButton   = document.getElementById("showQrButton");
+    const qrModal        = document.getElementById("qrModal");
+    const qrImage        = document.getElementById("qrImage");
+    const closeQrButton  = document.getElementById("closeQrButton");
+
+    const macInput       = document.getElementById("macInput");
+    const macAddButton   = document.getElementById("macAddButton");
+    const macStatusEl    = document.getElementById("macStatus");
+    const macListEl      = document.getElementById("macList");
+
+    // Buttons whose behavior you already have wired in your working version
+    const scanButton = document.getElementById("scanButton");
+    const disconnectAllButton = document.getElementById("disconnectAllButton");
+
+    // Basic data structures for items & categories.
+    // You can adapt this to match your existing code.
+    const items = new Map(); // id -> { id, btName, customName, category, distanceFeet, status, angleRad, ... }
+    const categories = new Set(["All Items", "Uncategorized"]);
+    let selectedItemId = null;
+
+    // MACs the user wants to track (when your BLE code exposes MACs, you can match against this)
+    const trackedMacs = new Set();
+
+    function setBtStatus(text, isError = false) {
+      btStatusEl.textContent = text;
+      btStatusEl.classList.toggle("error", isError);
+    }
+
+    function getVisibleItems() {
+      const filter = categoryFilterEl.value;
+      const list = [];
+      for (const [, item] of items) {
+        if (filter === "All Items") {
+          list.push(item);
+        } else if (item.category === filter) {
+          list.push(item);
+        }
+      }
+      return list;
+    }
+
+    function updateItemCount() {
+      const visible = getVisibleItems().length;
+      itemCountLabel.textContent = visible === 1 ? "1 item" : `${visible} items`;
+    }
+
+    function ensureCategoryOptions() {
+      const current = categoryFilterEl.value;
+      categoryFilterEl.innerHTML = "";
+      for (const name of categories) {
+        const opt = document.createElement("option");
+        opt.value = name;
+        opt.textContent = name;
+        categoryFilterEl.appendChild(opt);
+      }
+      if (categories.has(current)) {
+        categoryFilterEl.value = current;
+      } else {
+        categoryFilterEl.value = "All Items";
+      }
+    }
+
+    function hashToAngle(id) {
+      let hash = 0;
+      for (let i = 0; i < id.length; i++) {
+        hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
+      }
+      return (hash % 360) * (Math.PI / 180);
+    }
+
+    function distanceToRadius(distanceFeet, maxRadius) {
+      const MIN_DISTANCE_FEET = 3;
+      const MAX_DISTANCE_FEET = 80;
+      if (!distanceFeet || !isFinite(distanceFeet)) {
+        return maxRadius * 0.7;
+      }
+      const d = Math.min(Math.max(distanceFeet, MIN_DISTANCE_FEET), MAX_DISTANCE_FEET);
+      const ratio = (d - MIN_DISTANCE_FEET) / (MAX_DISTANCE_FEET - MIN_DISTANCE_FEET);
+      return maxRadius * (0.3 + ratio * 0.7);
+    }
+
+    function renderRadar() {
+      const old = radarEl.querySelectorAll(".item-dot, .item-pulse, .item-label, .radar-dropdown");
+      old.forEach(el => el.remove());
+
+      const rect = radarEl.getBoundingClientRect();
+      const centerX = rect.width / 2;
+      const centerY = rect.height / 2;
+      const maxRadius = Math.min(rect.width, rect.height) / 2 - 24;
+
+      const visible = getVisibleItems();
+
+      for (const item of visible) {
+        const angle = item.angleRad || hashToAngle(item.id);
+        const radius = distanceToRadius(item.distanceFeet, maxRadius);
+        const x = centerX + Math.cos(angle) * radius;
+        const y = centerY + Math.sin(angle) * radius;
+
+        item.x = x;
+        item.y = y;
+
+        const dot = document.createElement("div");
+        dot.className = "item-dot";
+        dot.style.left = `${x}px`;
+        dot.style.top = `${y}px`;
+
+        const pulse = document.createElement("div");
+        pulse.className = "item-pulse";
+        pulse.style.left = `${x}px`;
+        pulse.style.top = `${y}px`;
+
+        const label = document.createElement("div");
+        label.className = "item-label";
+        label.style.left = `${x}px`;
+        label.style.top = `${y}px`;
+        label.textContent = item.customName || item.btName || "Item";
+
+        if (item.status === "getting-far") {
+          dot.style.boxShadow = "0 0 16px rgba(255,179,71,1)";
+        } else if (item.status === "out-of-range") {
+          dot.style.boxShadow = "0 0 20px rgba(255,107,107,1)";
+          dot.style.opacity = 0.8;
+        }
+
+        const selectItem = (ev) => {
+          ev.stopPropagation();
+          selectedItemId = item.id;
+          focusItemInBox(item);
+          renderRadarDropdown();
+        };
+
+        dot.addEventListener("click", selectItem);
+        label.addEventListener("click", selectItem);
+
+        radarEl.appendChild(pulse);
+        radarEl.appendChild(dot);
+        radarEl.appendChild(label);
+      }
+
+      updateItemCount();
+    }
+
+    function focusItemInBox(item) {
+      const summary = {
+        name: item.customName || item.btName || "Item",
+        category: item.category,
+        distanceFeet: item.distanceFeet || null,
+        status: item.status,
+        id: item.id
+      };
+      dataBoxEl.value =
+        "Item details:\n" +
+        JSON.stringify(summary, null, 2) +
+        "\n\nIf your items send extra data over Bluetooth, it can appear here as well.";
+    }
+
+    function renderRadarDropdown() {
+      const oldDropdown = radarEl.querySelector(".radar-dropdown");
+      if (oldDropdown) oldDropdown.remove();
+
+      if (!selectedItemId) return;
+      const item = items.get(selectedItemId);
+      if (!item) return;
+
+      const rect = radarEl.getBoundingClientRect();
+      const dropdown = document.createElement("div");
+      dropdown.className = "radar-dropdown";
+
+      const name = item.customName || item.btName || "Item";
+      const now = Date.now();
+      const seconds = Math.round((now - (item.lastSeen || now)) / 1000);
+
+      let distanceText = "Distance: Unknown";
+      if (item.distanceFeet && isFinite(item.distanceFeet)) {
+        distanceText = `Distance: ~${Math.round(item.distanceFeet)} ft`;
+      }
+
+      let statusText = "Status: Nearby";
+      let statusColor = "#32ffc1";
+      if (item.status === "getting-far") {
+        statusText = "Status: Getting far";
+        statusColor = "#ffb347";
+      } else if (item.status === "out-of-range") {
+        statusText = "Status: Out of range";
+        statusColor = "#ff6b6b";
+      }
+
+      dropdown.innerHTML = `
+        <h4>${name}</h4>
+        <div class="radar-dropdown-row">Category: <span>${item.category}</span></div>
+        <div class="radar-dropdown-row">${distanceText}</div>
+        <div class="radar-dropdown-row" style="color:${statusColor};">${statusText}</div>
+        <div class="radar-dropdown-row">Last seen: <span>${seconds}s ago</span></div>
+        <div class="radar-dropdown-row">Item ID: <span>${String(item.id).slice(0, 10)}…</span></div>
+      `;
+
+      const actions = document.createElement("div");
+      actions.className = "radar-dropdown-actions";
+
+      const renameBtn = document.createElement("button");
+      renameBtn.className = "btn-secondary btn-small";
+      renameBtn.textContent = "Rename";
+      renameBtn.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        const newName = prompt("Enter a new name for this item:", item.customName || item.btName || "Item");
+        if (newName && newName.trim()) {
+          item.customName = newName.trim();
+          renderAll();
+          renderRadarDropdown();
+        }
+      });
+
+      const removeBtn = document.createElement("button");
+      removeBtn.className = "btn-danger btn-small";
+      removeBtn.textContent = "Remove";
+      removeBtn.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        items.delete(item.id);
+        selectedItemId = null;
+        renderAll();
+      });
+
+      const categorySelect = document.createElement("select");
+      for (const cat of categories) {
+        if (cat === "All Items") continue;
+        const opt = document.createElement("option");
+        opt.value = cat;
+        opt.textContent = cat;
+        categorySelect.appendChild(opt);
+      }
+      if (!categories.has(item.category)) {
+        item.category = "Uncategorized";
+      }
+      categorySelect.value = item.category;
+      categorySelect.addEventListener("click", (ev) => ev.stopPropagation());
+      categorySelect.addEventListener("change", (ev) => {
+        ev.stopPropagation();
+        item.category = categorySelect.value || "Uncategorized";
+        renderAll();
+        renderRadarDropdown();
+      });
+
+      actions.appendChild(renameBtn);
+      actions.appendChild(removeBtn);
+      actions.appendChild(categorySelect);
+
+      dropdown.appendChild(actions);
+
+      const offsetX = item.x || rect.width / 2;
+      const offsetY = (item.y || rect.height / 2) - 40;
+      dropdown.style.left = `${offsetX}px`;
+      dropdown.style.top = `${offsetY}px`;
+      dropdown.style.transform = "translate(-50%, -100%)";
+
+      radarEl.appendChild(dropdown);
+    }
+
+    document.addEventListener("click", (ev) => {
+      const dropdown = radarEl.querySelector(".radar-dropdown");
+      if (!dropdown) return;
+      if (radarEl.contains(ev.target)) return;
+      selectedItemId = null;
+      dropdown.remove();
+    });
+
+    function renderItemList() {
+      itemListEl.innerHTML = "";
+      const visible = getVisibleItems();
+      if (!visible.length) {
+        const empty = document.createElement("div");
+        empty.style.fontSize = "11px";
+        empty.style.color = "var(--muted)";
+        empty.textContent = "No items connected yet. Click “Scan for items” above.";
+        itemListEl.appendChild(empty);
+        return;
+      }
+
+      for (const item of visible) {
+        const card = document.createElement("div");
+        card.className = "device-card";
+
+        const main = document.createElement("div");
+        main.className = "device-card-main";
+
+        const nameRow = document.createElement("div");
+        nameRow.className = "device-name-row";
+
+        const nameEl = document.createElement("div");
+        nameEl.className = "device-name";
+        nameEl.textContent = item.customName || item.btName || "Item";
+
+        const renameBtn = document.createElement("button");
+        renameBtn.className = "btn-secondary btn-small";
+        renameBtn.textContent = "Rename";
+        renameBtn.addEventListener("click", (ev) => {
+          ev.stopPropagation();
+          const newName = prompt("Enter a new name for this item:", item.customName || item.btName || "Item");
+          if (newName && newName.trim()) {
+            item.customName = newName.trim();
+            renderAll();
+          }
+        });
+
+        nameRow.appendChild(nameEl);
+        nameRow.appendChild(renameBtn);
+
+        const metaEl = document.createElement("div");
+        metaEl.className = "device-meta";
+
+        let distanceText = "Distance: unknown";
+        if (item.distanceFeet && isFinite(item.distanceFeet)) {
+          distanceText = `Distance: ~${Math.round(item.distanceFeet)} ft`;
+        }
+
+        metaEl.textContent = `${distanceText} · Category: ${item.category}`;
+
+        main.appendChild(nameRow);
+        main.appendChild(metaEl);
+
+        const rightCol = document.createElement("div");
+        rightCol.style.display = "flex";
+        rightCol.style.flexDirection = "column";
+        rightCol.style.alignItems = "flex-end";
+        rightCol.style.gap = "4px";
+
+        const pill = document.createElement("div");
+        pill.className = "pill";
+        let pillText = "Nearby";
+        if (item.status === "getting-far") {
+          pill.classList.add("pill-warning");
+          pillText = "Getting far";
+        } else if (item.status === "out-of-range") {
+          pill.classList.add("pill-danger");
+          pillText = "Out of range";
+        }
+        pill.textContent = pillText;
+
+        const categorySelect = document.createElement("select");
+        for (const cat of categories) {
+          if (cat === "All Items") continue;
+          const opt = document.createElement("option");
+          opt.value = cat;
+          opt.textContent = cat;
+          categorySelect.appendChild(opt);
+        }
+        if (!categories.has(item.category)) {
+          item.category = "Uncategorized";
+        }
+        categorySelect.value = item.category;
+        categorySelect.addEventListener("change", () => {
+          item.category = categorySelect.value || "Uncategorized";
+          renderAll();
+        });
+
+        const removeBtn = document.createElement("button");
+        removeBtn.className = "btn-danger btn-small";
+        removeBtn.textContent = "Remove";
+        removeBtn.addEventListener("click", (ev) => {
+          ev.stopPropagation();
+          items.delete(item.id);
+          if (selectedItemId === item.id) {
+            selectedItemId = null;
+          }
+          renderAll();
+        });
+
+        card.addEventListener("click", () => {
+          selectedItemId = item.id;
+          focusItemInBox(item);
+          renderRadarDropdown();
+        });
+
+        rightCol.appendChild(pill);
+        rightCol.appendChild(categorySelect);
+        rightCol.appendChild(removeBtn);
+
+        card.appendChild(main);
+        card.appendChild(rightCol);
+        itemListEl.appendChild(card);
+      }
+    }
+
+    function renderAll() {
+      renderRadar();
+      renderItemList();
+      renderRadarDropdown();
+    }
+
+    // ======== QR CODE LOGIC ========
+    function openQrModal() {
+      const url = window.location.href.split("#")[0];
+      const encoded = encodeURIComponent(url);
+      const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?data=${encoded}&size=220x220`;
+      qrImage.src = qrSrc;
+      qrModal.style.display = "flex";
+    }
+
+    function closeQrModal() {
+      qrModal.style.display = "none";
+    }
+
+    showQrButton.addEventListener("click", (e) => {
+      e.preventDefault();
+      openQrModal();
+    });
+
+    closeQrButton.addEventListener("click", (e) => {
+      e.preventDefault();
+      closeQrModal();
+    });
+
+    qrModal.addEventListener("click", (e) => {
+      if (e.target === qrModal) {
+        closeQrModal();
+      }
+    });
+
+    // ======== MAC ADDRESS LOGIC ========
+    function normalizeMac(raw) {
+      if (!raw) return null;
+      let mac = raw.trim().toUpperCase();
+      mac = mac.replace(/[^0-9A-F]/g, "");
+      if (mac.length !== 12) return null;
+      return mac.match(/.{1,2}/g).join(":");
+    }
+
+    function renderMacList() {
+      macListEl.innerHTML = "";
+      if (!trackedMacs.size) {
+        const empty = document.createElement("div");
+        empty.style.fontSize = "11px";
+        empty.style.color = "var(--muted)";
+        empty.textContent = "No MAC addresses saved yet.";
+        macListEl.appendChild(empty);
+        return;
+      }
+
+      for (const mac of trackedMacs) {
+        const row = document.createElement("div");
+        row.className = "device-card";
+        row.style.fontSize = "11px";
+        row.style.padding = "4px 6px";
+
+        const label = document.createElement("div");
+        label.textContent = mac;
+
+        const removeBtn = document.createElement("button");
+        removeBtn.className = "btn-danger btn-small";
+        removeBtn.textContent = "Remove";
+        removeBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          trackedMacs.delete(mac);
+          renderMacList();
+          macStatusEl.textContent = `Removed MAC ${mac}.`;
+          macStatusEl.classList.remove("error");
+        });
+
+        row.appendChild(label);
+        row.appendChild(removeBtn);
+        macListEl.appendChild(row);
+      }
+    }
+
+    macAddButton.addEventListener("click", (e) => {
+      e.preventDefault();
+      const normalized = normalizeMac(macInput.value);
+      if (!normalized) {
+        macStatusEl.textContent =
+          "That doesn’t look like a valid MAC. Use AA:BB:CC:DD:EE:FF or AABBCCDDEEFF.";
+        macStatusEl.classList.add("error");
+        return;
+      }
+
+      macStatusEl.classList.remove("error");
+
+      if (trackedMacs.has(normalized)) {
+        macStatusEl.textContent = `MAC ${normalized} is already saved.`;
+      } else {
+        trackedMacs.add(normalized);
+        macStatusEl.textContent = `Saved MAC ${normalized}. When an item matches this MAC, you can rename and track it.`;
+      }
+
+      macInput.value = "";
+      renderMacList();
+    });
+
+    // ======== CATEGORY FILTER EVENTS ========
+    categoryFilterEl.addEventListener("change", () => {
+      renderAll();
+    });
+
+    addCategoryButton.addEventListener("click", () => {
+      const name = newCategoryInput.value.trim();
+      if (!name) return;
+      if (!categories.has(name)) {
+        categories.add(name);
+        ensureCategoryOptions();
+      }
+      newCategoryInput.value = "";
+    });
+
+    // ======== PLACEHOLDER: YOUR EXISTING BLUETOOTH & ALERT LOGIC ========
+    // Insert the working scan/connect/distance/notification/sound code from your
+    // current app here. Use the `items` map and the structure above to drive
+    // radar + list rendering. Once items are updated, call `renderAll()`.
+
+    // Example shape (NOT real Bluetooth code):
+    //
+    // scanButton.addEventListener("click", async () => {
+    //   // Your existing navigator.bluetooth.requestDevice(...) and logic here
+    //   // When you have a device and computed distance/status:
+    //   const id = device.id;
+    //   items.set(id, {
+    //     id,
+    //     btName: device.name || "Unnamed Item",
+    //     customName: null,
+    //     category: "Uncategorized",
+    //     distanceFeet: 12,
+    //     status: "nearby",
+    //     angleRad: hashToAngle(id),
+    //     lastSeen: Date.now()
+    //   });
+    //   renderAll();
+    // });
+    //
+    // disconnectAllButton.addEventListener("click", () => {
+    //   items.clear();
+    //   renderAll();
+    //   setBtStatus("All items disconnected.");
+    // });
+
+    // ======== INITIALIZE ========
+    setBtStatus("Web Bluetooth ready. Click “Scan for items” to begin.");
+    ensureCategoryOptions();
+    renderAll();
+    renderMacList();
+  </script>
+</body>
+</html>
