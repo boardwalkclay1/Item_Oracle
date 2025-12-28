@@ -1,0 +1,154 @@
+#include <Arduino.h>
+#include <WiFi.h>
+#include <ESPmDNS.h>
+#include <WebServer.h>
+#include <ArduinoJson.h>
+#include <NimBLEDevice.h>
+
+// ==== WiFi CONFIG (placeholder for now) ====
+const char* WIFI_SSID     = "YOUR_WIFI_SSID";
+const char* WIFI_PASSWORD = "YOUR_WIFI_PASSWORD";
+
+// ==== BLE UUIDs ====
+static const char* SERVICE_UUID         = "7b2a0001-0000-4b8d-8f2d-000000000001";
+static const char* STATUS_CHAR_UUID     = "7b2a0002-0000-4b8d-8f2d-000000000001";
+static const char* CONTROL_CHAR_UUID    = "7b2a0003-0000-4b8d-8f2d-000000000001";
+
+WebServer server(80);
+bool wifiEnabled = false;
+
+// BLE globals
+NimBLEServer* pServer = nullptr;
+NimBLECharacteristic* pStatusChar = nullptr;
+NimBLECharacteristic* pControlChar = nullptr;
+
+// Forward declarations
+void setupWiFi();
+void setupHttpServer();
+String buildStatusJson();
+
+class ControlCallbacks : public NimBLECharacteristicCallbacks {
+  void onWrite(NimBLECharacteristic* pCharacteristic) override {
+    std::string value = pCharacteristic->getValue();
+    if (value.empty()) return;
+
+    if (value == "WIFI_ON") {
+      if (!wifiEnabled) {
+        wifiEnabled = true;
+        setupWiFi();
+        setupHttpServer();
+      }
+    } else if (value == "WIFI_OFF") {
+      if (wifiEnabled) {
+        wifiEnabled = false;
+        WiFi.disconnect(true);
+        WiFi.mode(WIFI_OFF);
+      }
+    }
+  }
+};
+
+void setupWiFi() {
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+
+  unsigned long start = millis();
+  while (WiFi.status() != WL_CONNECTED && millis() - start < 15000) {
+    delay(250);
+  }
+
+  if (WiFi.status() == WL_CONNECTED) {
+    if (MDNS.begin("esp32-locator")) {
+      // mDNS started
+    }
+  }
+}
+
+void handleStatus() {
+  String json = buildStatusJson();
+  server.send(200, "application/json", json);
+}
+
+void setupHttpServer() {
+  server.on("/status", HTTP_GET, handleStatus);
+  server.begin();
+}
+
+String buildStatusJson() {
+  StaticJsonDocument<256> doc;
+  doc["name"] = "ESP32-Locator";
+  doc["wifi"] = wifiEnabled;
+  doc["ip"] = (wifiEnabled && WiFi.status() == WL_CONNECTED)
+                ? WiFi.localIP().toString()
+                : "";
+  doc["rssi_wifi"] = (wifiEnabled && WiFi.status() == WL_CONNECTED)
+                ? WiFi.RSSI()
+                : 0;
+  doc["mac"] = WiFi.macAddress();
+  doc["timestamp"] = (uint32_t)(millis() / 1000);
+
+  String out;
+  serializeJson(doc, out);
+  return out;
+}
+
+void setupBLE() {
+  NimBLEDevice::init("ESP32-Locator");
+  NimBLEDevice::setPower(ESP_PWR_LVL_P7); // Tx power
+  NimBLEDevice::setSecurityAuth(false, false, true);
+
+  pServer = NimBLEDevice::createServer();
+
+  NimBLEService* pService = pServer->createService(SERVICE_UUID);
+
+  // STATUS characteristic (read/notify)
+  pStatusChar = pService->createCharacteristic(
+    STATUS_CHAR_UUID,
+    NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY
+  );
+
+  // CONTROL characteristic (write)
+  pControlChar = pService->createCharacteristic(
+    CONTROL_CHAR_UUID,
+    NIMBLE_PROPERTY::WRITE
+  );
+  pControlChar->setCallbacks(new ControlCallbacks());
+
+  pService->start();
+
+  NimBLEAdvertising* pAdvertising = NimBLEDevice::getAdvertising();
+  pAdvertising->addServiceUUID(SERVICE_UUID);
+  pAdvertising->setScanResponse(true);
+  pAdvertising->start();
+}
+
+void setup() {
+  Serial.begin(115200);
+  delay(500);
+
+  // Start BLE only; WiFi off by default
+  WiFi.mode(WIFI_OFF);
+  wifiEnabled = false;
+
+  setupBLE();
+}
+
+void loop() {
+  // If WiFi is enabled, keep HTTP server alive
+  if (wifiEnabled) {
+    server.handleClient();
+  }
+
+  // Periodically update status JSON over BLE
+  static unsigned long lastUpdate = 0;
+  if (millis() - lastUpdate > 2000) {
+    lastUpdate = millis();
+    if (pStatusChar) {
+      String status = buildStatusJson();
+      pStatusChar->setValue(status.c_str());
+      pStatusChar->notify();
+    }
+  }
+
+  delay(10);
+}
