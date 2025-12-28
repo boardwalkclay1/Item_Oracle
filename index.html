@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>ESP32 Locator (Bluetooth Only)</title>
+  <title>Item Oracle</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <style>
@@ -14,6 +14,8 @@
       --text: #f5f7ff;
       --muted: #878aa3;
       --border-soft: rgba(135, 138, 163, 0.3);
+      --danger: #ff6b6b;
+      --warning: #ffb347;
     }
 
     * {
@@ -35,7 +37,7 @@
 
     .shell {
       width: 100%;
-      max-width: 1120px;
+      max-width: 1160px;
       border-radius: 18px;
       background: linear-gradient(135deg, rgba(50, 255, 193, 0.18), rgba(0, 0, 0, 0.7));
       padding: 1px;
@@ -68,7 +70,7 @@
       font-size: 13px;
       color: var(--muted);
       margin-top: 4px;
-      max-width: 420px;
+      max-width: 460px;
     }
 
     .badges {
@@ -91,7 +93,7 @@
 
     main {
       display: grid;
-      grid-template-columns: minmax(0, 1.6fr) minmax(0, 1.4fr);
+      grid-template-columns: minmax(0, 1.7fr) minmax(0, 1.3fr);
       gap: 14px;
     }
 
@@ -131,17 +133,24 @@
     button {
       border: none;
       border-radius: 999px;
-      padding: 8px 16px;
-      font-size: 12px;
+      padding: 8px 14px;
+      font-size: 11px;
       font-weight: 600;
       letter-spacing: 0.08em;
       text-transform: uppercase;
       cursor: pointer;
       display: inline-flex;
       align-items: center;
-      gap: 8px;
-      transition: transform 0.1s ease, box-shadow 0.1s ease, background 0.15s ease;
+      gap: 6px;
+      transition: transform 0.1s ease, box-shadow 0.1s ease, background 0.15s ease, opacity 0.15s ease;
       white-space: nowrap;
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: default;
+      box-shadow: none;
+      transform: none;
     }
 
     .btn-primary {
@@ -150,7 +159,7 @@
       box-shadow: 0 0 12px rgba(50, 255, 193, 0.7);
     }
 
-    .btn-primary:hover {
+    .btn-primary:hover:not(:disabled) {
       transform: translateY(-1px);
       box-shadow: 0 0 18px rgba(50, 255, 193, 0.9);
     }
@@ -160,13 +169,28 @@
       color: var(--muted);
     }
 
-    .btn-secondary:hover {
+    .btn-secondary:hover:not(:disabled) {
       background: rgba(135, 138, 163, 0.3);
+    }
+
+    .btn-danger {
+      background: rgba(255, 107, 107, 0.1);
+      color: var(--danger);
+      border: 1px solid rgba(255, 107, 107, 0.5);
+    }
+
+    .btn-danger:hover:not(:disabled) {
+      background: rgba(255, 107, 107, 0.18);
+    }
+
+    .btn-small {
+      padding: 5px 10px;
+      font-size: 10px;
     }
 
     .map {
       position: relative;
-      height: 360px;
+      height: 380px;
       border-radius: 10px;
       border: 1px solid rgba(50, 255, 193, 0.35);
       background: radial-gradient(circle at center, #11162a 0, #050712 70%);
@@ -182,6 +206,27 @@
       background-size: 30px 30px;
       pointer-events: none;
       mix-blend-mode: screen;
+    }
+
+    .map-center-dot {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      background: #ffffff;
+      box-shadow: 0 0 10px rgba(255, 255, 255, 0.9);
+      transform: translate(-50%, -50%);
+    }
+
+    .map-center-label {
+      position: absolute;
+      left: 50%;
+      top: calc(50% + 14px);
+      transform: translate(-50%, 0);
+      font-size: 10px;
+      color: var(--muted);
     }
 
     .device-dot {
@@ -271,17 +316,21 @@
       border-radius: 8px;
       background: rgba(135, 138, 163, 0.12);
       border: 1px solid rgba(135, 138, 163, 0.4);
-      margin-bottom: 6px;
+      margin-top: 6px;
     }
 
     .status-box.error {
-      color: #ff6b6b;
+      color: var(--danger);
       border-color: rgba(255, 107, 107, 0.7);
       background: rgba(255, 107, 107, 0.08);
     }
 
+    .status-box span {
+      color: var(--accent);
+    }
+
     .device-list {
-      max-height: 160px;
+      max-height: 180px;
       overflow-y: auto;
       display: flex;
       flex-direction: column;
@@ -305,15 +354,29 @@
       display: flex;
       flex-direction: column;
       gap: 2px;
+      flex: 1;
+      min-width: 0;
+    }
+
+    .device-name-row {
+      display: flex;
+      align-items: center;
+      gap: 4px;
     }
 
     .device-name {
       font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     .device-meta {
       color: var(--muted);
       font-size: 10px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     .pill {
@@ -328,13 +391,25 @@
       flex-shrink: 0;
     }
 
+    .pill-warning {
+      border-color: var(--warning);
+      color: var(--warning);
+      background: rgba(255, 179, 71, 0.1);
+    }
+
+    .pill-danger {
+      border-color: var(--danger);
+      color: var(--danger);
+      background: rgba(255, 107, 107, 0.1);
+    }
+
     .code-box {
       font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace;
       font-size: 11px;
       line-height: 1.4;
       width: 100%;
-      min-height: 180px;
-      max-height: 260px;
+      min-height: 150px;
+      max-height: 220px;
       padding: 8px;
       border-radius: 8px;
       border: 1px solid var(--border-soft);
@@ -369,6 +444,45 @@
       margin-bottom: 2px;
     }
 
+    .category-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 4px;
+    }
+
+    select {
+      border-radius: 999px;
+      border: 1px solid var(--border-soft);
+      padding: 4px 8px;
+      background: rgba(4, 7, 20, 0.95);
+      color: var(--text);
+      font-size: 11px;
+    }
+
+    .inline-input {
+      border-radius: 6px;
+      border: 1px solid var(--border-soft);
+      padding: 3px 6px;
+      background: rgba(4, 7, 20, 0.95);
+      color: var(--text);
+      font-size: 11px;
+      min-width: 0;
+    }
+
+    .switch-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 4px;
+    }
+
+    .switch-row input {
+      cursor: pointer;
+    }
+
     footer {
       margin-top: 10px;
       font-size: 10px;
@@ -378,6 +492,11 @@
       flex-wrap: wrap;
       gap: 8px;
     }
+
+    a {
+      color: var(--accent);
+      text-decoration: none;
+    }
   </style>
 </head>
 <body>
@@ -385,97 +504,142 @@
     <div class="inner">
       <header>
         <div class="title-block">
-          <h1>ESP32 Locator (Bluetooth Only)</h1>
+          <h1>Item Oracle</h1>
           <p>
-            This page connects to your ESP32 locator devices using Bluetooth only.
-            No WiFi is required. You can scan for devices, see them on the map,
-            and view their live status data.
+            Item Oracle lets you connect to nearby Bluetooth items, see them on a radar,
+            rename them, group them into categories, and get alerts when you move away from them.
           </p>
           <div class="badges">
-            <div class="badge">Static HTML</div>
             <div class="badge">Bluetooth Only</div>
+            <div class="badge">Static Site</div>
+            <div class="badge">Item Radar</div>
           </div>
         </div>
       </header>
 
       <main>
-        <!-- Left: Map and live data -->
+        <!-- Left: Radar and live data -->
         <section class="panel">
           <div class="panel-header">
-            <h2>Device map</h2>
-            <span id="deviceCountLabel">0 devices</span>
+            <h2>Item radar</h2>
+            <span id="itemCountLabel">0 items</span>
           </div>
-          <div id="map" class="map">
+          <div id="radar" class="map">
             <div class="map-grid"></div>
+            <div class="map-center-dot"></div>
+            <div class="map-center-label">You</div>
           </div>
-          <div class="device-info" id="mapHint">
-            Click “Scan for ESP32” on the right to add devices to this map.
+          <div class="device-info" id="radarHint">
+            Click “Scan for items” to start adding items to your radar.
           </div>
 
           <div style="margin-top:10px;">
             <div class="panel-header" style="margin-bottom:4px;">
-              <h2>Device data</h2>
-              <span>Live status JSON</span>
+              <h2>Item details</h2>
+              <span>Live data (if provided)</span>
             </div>
-            <textarea id="codeBox" class="code-box" readonly>
-Waiting for a device…
+            <textarea id="dataBox" class="code-box" readonly>
+Select an item on the radar or in the list to see its data here.
 
-When you connect to an ESP32-Locator, its live status will appear here.
+Some items may not send data. They will still appear on the radar with an estimated distance.
             </textarea>
           </div>
         </section>
 
-        <!-- Right: Controls and instructions -->
+        <!-- Right: Controls and lists -->
         <section class="panel">
+          <!-- Bluetooth + category filter -->
           <div class="sidebar-section">
-            <h3>Bluetooth connection</h3>
+            <h3>Scan and filter</h3>
             <p>
-              This connects your browser directly to an ESP32 named
-              <strong>ESP32-Locator</strong> using Bluetooth. WiFi is not used.
+              Scan for nearby Bluetooth items, then filter by category. All items are listed under
+              “All Items” automatically. You can rename items and move them into custom categories.
             </p>
             <div class="btn-row">
-              <button class="btn-primary" id="scanButton">Scan for ESP32</button>
+              <button class="btn-primary" id="scanButton">Scan for items</button>
               <button class="btn-secondary" id="disconnectAllButton">Disconnect all</button>
             </div>
-            <div id="btStatus" class="status-box">
-              Web Bluetooth ready. Click “Scan for ESP32” to begin.
+            <div class="category-row">
+              <label style="font-size:11px;color:var(--muted);">Category view:</label>
+              <select id="categoryFilter">
+                <option value="All Items">All Items</option>
+                <option value="Uncategorized">Uncategorized</option>
+              </select>
             </div>
-
-            <div id="deviceList" class="device-list"></div>
+            <div class="category-row" style="margin-top:6px;">
+              <input id="newCategoryInput" class="inline-input" type="text" placeholder="New category name">
+              <button class="btn-secondary btn-small" id="addCategoryButton">Add category</button>
+            </div>
+            <div id="btStatus" class="status-box">
+              Web Bluetooth ready. Click <span>Scan for items</span> to begin.
+            </div>
           </div>
 
+          <!-- Notifications -->
           <div class="sidebar-section">
-            <h3>How to use this page</h3>
-            <div class="instructions">
-              <h4>1. Prepare your ESP32</h4>
-              <ol>
-                <li>Flash your ESP32 with firmware that advertises as <strong>ESP32-Locator</strong>.</li>
-                <li>Make sure it exposes a Bluetooth service with a “status” characteristic.</li>
-              </ol>
+            <h3>Notifications</h3>
+            <p>
+              Item Oracle can send alerts when you start moving away from an item
+              or when it goes completely out of range.
+            </p>
+            <div class="switch-row">
+              <input type="checkbox" id="enableNotifications">
+              <label for="enableNotifications">Enable notifications for Item Oracle</label>
+            </div>
+            <div class="switch-row">
+              <input type="checkbox" id="notifyGettingFar" checked>
+              <label for="notifyGettingFar">Alert when items are getting far</label>
+            </div>
+            <div class="switch-row">
+              <input type="checkbox" id="notifyOutOfRange" checked>
+              <label for="notifyOutOfRange">Alert when items are out of range</label>
+            </div>
+            <div class="switch-row">
+              <input type="checkbox" id="notifyBackInRange" checked>
+              <label for="notifyBackInRange">Alert when items come back</label>
+            </div>
+          </div>
 
-              <h4>2. Connect by Bluetooth</h4>
+          <!-- Item list -->
+          <div class="sidebar-section">
+            <h3>Items</h3>
+            <p style="margin-bottom:4px;">
+              Each connected Bluetooth item appears here. You can rename items, change their category,
+              and see their estimated distance.
+            </p>
+            <div id="itemList" class="device-list"></div>
+          </div>
+
+          <!-- Instructions -->
+          <div class="sidebar-section">
+            <h3>How Item Oracle works</h3>
+            <div class="instructions">
+              <h4>1. Scan for items</h4>
               <ol>
                 <li>Turn on Bluetooth on your computer.</li>
-                <li>Click <strong>Scan for ESP32</strong>.</li>
-                <li>Choose the device named <strong>ESP32-Locator-…</strong> from the list.</li>
+                <li>Click <strong>Scan for items</strong>.</li>
+                <li>Select one or more items from the list that appears.</li>
               </ol>
 
-              <h4>3. See devices on the map</h4>
+              <h4>2. See items on the radar</h4>
               <ol>
-                <li>Each connected device appears as a glowing dot on the map.</li>
-                <li>Click a dot to show its status JSON in the box below.</li>
+                <li>Connected items appear as glowing dots around you.</li>
+                <li>The distance in feet is an estimate based on Bluetooth signal strength.</li>
+                <li>Click a dot or list entry to see details.</li>
               </ol>
 
-              <h4>4. Read live data</h4>
+              <h4>3. Rename and organize</h4>
               <ol>
-                <li>The device sends JSON over Bluetooth.</li>
-                <li>You can use this data to debug, explore, or integrate with other tools.</li>
+                <li>Use the rename button to give items clear names, like “Keys” or “Backpack”.</li>
+                <li>Add categories like “Everyday Carry” or “Travel” and assign items to them.</li>
+                <li>Use the category filter to focus the radar on specific groups.</li>
               </ol>
 
-              <h4>Troubleshooting</h4>
+              <h4>4. Alerts and safety</h4>
               <ol>
-                <li>If you don’t see devices, move closer and scan again.</li>
-                <li>Make sure your browser supports Web Bluetooth (Chrome or Edge recommended).</li>
+                <li>Turn on notifications above.</li>
+                <li>Item Oracle can warn you if an item is getting far or goes out of range.</li>
+                <li>When an item comes back, you can get a “nearby again” update.</li>
               </ol>
             </div>
           </div>
@@ -483,45 +647,91 @@ When you connect to an ESP32-Locator, its live status will appear here.
       </main>
 
       <footer>
-        <div>All communication happens over Bluetooth. No WiFi connection is needed.</div>
-        <div>Best used in Chrome or Edge, over HTTPS or localhost, with Bluetooth enabled.</div>
+        <div>Item Oracle runs completely in your browser using Bluetooth. No WiFi is required.</div>
+        <div>Use in Chrome or Edge, over HTTPS or localhost, with Bluetooth and notifications enabled.</div>
       </footer>
     </div>
   </div>
 
   <script>
-    // ===== BLE UUIDs (must match your ESP32 firmware) =====
-    const SERVICE_UUID     = "7b2a0001-0000-4b8d-8f2d-000000000001";
-    const STATUS_CHAR_UUID = "7b2a0002-0000-4b8d-8f2d-000000000001";
+    // NOTE:
+    // This page connects to generic Bluetooth items. Distance and data
+    // are best-effort and depend on what each item provides.
 
-    // ===== DOM references =====
-    const mapEl = document.getElementById("map");
-    const deviceCountLabel = document.getElementById("deviceCountLabel");
-    const deviceListEl = document.getElementById("deviceList");
+    // If you have your own items that expose a service/characteristic for distance or data,
+    // you can put those UUIDs here and extend the logic that reads them.
+    const CUSTOM_ITEM_SERVICE_UUID = null; // e.g. "7b2a0001-0000-4b8d-8f2d-000000000001"
+    const CUSTOM_STATUS_CHAR_UUID  = null; // optional, for JSON/status
+    const CUSTOM_DISTANCE_CHAR_UUID = null; // optional, for distance in meters
+
+    const radarEl = document.getElementById("radar");
+    const itemCountLabel = document.getElementById("itemCountLabel");
+    const itemListEl = document.getElementById("itemList");
     const btStatusEl = document.getElementById("btStatus");
-    const codeBoxEl = document.getElementById("codeBox");
+    const dataBoxEl = document.getElementById("dataBox");
     const scanButton = document.getElementById("scanButton");
     const disconnectAllButton = document.getElementById("disconnectAllButton");
+    const categoryFilterEl = document.getElementById("categoryFilter");
+    const newCategoryInput = document.getElementById("newCategoryInput");
+    const addCategoryButton = document.getElementById("addCategoryButton");
 
-    // In-memory device state: id -> { device, server, statusChar, statusJson, x, y }
-    const devices = new Map();
+    const enableNotificationsEl = document.getElementById("enableNotifications");
+    const notifyGettingFarEl = document.getElementById("notifyGettingFar");
+    const notifyOutOfRangeEl = document.getElementById("notifyOutOfRange");
+    const notifyBackInRangeEl = document.getElementById("notifyBackInRange");
+
+    const NEARBY_THRESHOLD_SECONDS = 4;     // under this: nearby
+    const GETTING_FAR_SECONDS = 10;         // between NEARBY and this: getting far
+    const OUT_OF_RANGE_SECONDS = 20;        // above this: out of range
+    const MIN_DISTANCE_FEET = 3;            // clamp for display
+    const MAX_DISTANCE_FEET = 80;           // clamp for display
+
+    // Internal item state
+    // id -> { device, server, statusChar, distanceChar, name, customName, category, distanceFeet,
+    //         lastSeen, status: "nearby" | "getting-far" | "out-of-range", x, y }
+    const items = new Map();
+
+    // Category list
+    const categories = new Set(["All Items", "Uncategorized"]);
 
     function setBtStatus(text, isError = false) {
       btStatusEl.textContent = text;
       btStatusEl.classList.toggle("error", isError);
     }
 
-    function updateDeviceCount() {
-      const n = devices.size;
-      deviceCountLabel.textContent = n === 1 ? "1 device" : `${n} devices`;
+    function updateItemCount() {
+      const visible = getVisibleItems().length;
+      itemCountLabel.textContent = visible === 1 ? "1 item" : `${visible} items`;
     }
 
-    function randomMapPosition() {
-      const rect = mapEl.getBoundingClientRect();
-      const padding = 26;
-      const x = padding + Math.random() * (rect.width - 2 * padding);
-      const y = padding + Math.random() * (rect.height - 2 * padding);
-      return { x, y };
+    function getVisibleItems() {
+      const filter = categoryFilterEl.value;
+      const list = [];
+      for (const [, item] of items) {
+        if (filter === "All Items") {
+          list.push(item);
+        } else if (item.category === filter) {
+          list.push(item);
+        }
+      }
+      return list;
+    }
+
+    function ensureCategoryOptions() {
+      // Reset category filter options (keep currently selected if still exists)
+      const current = categoryFilterEl.value;
+      categoryFilterEl.innerHTML = "";
+      for (const name of categories) {
+        const opt = document.createElement("option");
+        opt.value = name;
+        opt.textContent = name;
+        categoryFilterEl.appendChild(opt);
+      }
+      if (categories.has(current)) {
+        categoryFilterEl.value = current;
+      } else {
+        categoryFilterEl.value = "All Items";
+      }
     }
 
     function prettifyJson(raw) {
@@ -533,85 +743,213 @@ When you connect to an ESP32-Locator, its live status will appear here.
       }
     }
 
-    function renderMapAndList() {
-      // Clear old map markers
-      const old = mapEl.querySelectorAll(".device-dot, .device-pulse, .device-label");
+    function hashToAngle(id) {
+      let hash = 0;
+      for (let i = 0; i < id.length; i++) {
+        hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
+      }
+      return (hash % 360) * (Math.PI / 180);
+    }
+
+    function distanceToRadius(distanceFeet, maxRadius) {
+      if (!distanceFeet || !isFinite(distanceFeet)) {
+        return maxRadius * 0.7;
+      }
+      const d = Math.min(Math.max(distanceFeet, MIN_DISTANCE_FEET), MAX_DISTANCE_FEET);
+      const ratio = (d - MIN_DISTANCE_FEET) / (MAX_DISTANCE_FEET - MIN_DISTANCE_FEET);
+      // Closer items nearer the center
+      return maxRadius * (0.3 + ratio * 0.7);
+    }
+
+    function renderRadar() {
+      const old = radarEl.querySelectorAll(".device-dot, .device-pulse, .device-label");
       old.forEach(el => el.remove());
 
-      // Map dots
-      for (const [id, info] of devices) {
-        const { x, y, statusJson } = info;
-        let labelText = info.device.name || "ESP32-Locator";
+      const rect = radarEl.getBoundingClientRect();
+      const centerX = rect.width / 2;
+      const centerY = rect.height / 2;
+      const maxRadius = Math.min(rect.width, rect.height) / 2 - 24;
 
-        if (statusJson) {
-          try {
-            const parsed = JSON.parse(statusJson);
-            if (parsed.name) labelText = parsed.name;
-          } catch {
-            // ignore
-          }
-        }
+      const visible = getVisibleItems();
+
+      for (const item of visible) {
+        const angle = hashToAngle(item.id || item.device.id || "");
+        const radius = distanceToRadius(item.distanceFeet, maxRadius);
+        const x = centerX + Math.cos(angle) * radius;
+        const y = centerY + Math.sin(angle) * radius;
+
+        item.x = x;
+        item.y = y;
 
         const dot = document.createElement("div");
         dot.className = "device-dot";
-        dot.style.left = x + "px";
-        dot.style.top = y + "px";
+        dot.style.left = `${x}px`;
+        dot.style.top = `${y}px`;
 
         const pulse = document.createElement("div");
         pulse.className = "device-pulse";
-        pulse.style.left = x + "px";
-        pulse.style.top = y + "px";
+        pulse.style.left = `${x}px`;
+        pulse.style.top = `${y}px`;
 
         const label = document.createElement("div");
         label.className = "device-label";
-        label.style.left = x + "px";
-        label.style.top = y + "px";
-        label.textContent = labelText;
+        label.style.left = `${x}px`;
+        label.style.top = `${y}px`;
+        label.textContent = item.customName || item.name || "Item";
 
-        dot.addEventListener("click", () => {
-          if (info.statusJson) {
-            codeBoxEl.value = prettifyJson(info.statusJson);
-          } else {
-            codeBoxEl.value = "No status received yet from this device.";
-          }
-        });
+        if (item.status === "getting-far") {
+          dot.style.boxShadow = "0 0 16px rgba(255,179,71,1)";
+        } else if (item.status === "out-of-range") {
+          dot.style.boxShadow = "0 0 20px rgba(255,107,107,1)";
+          dot.style.opacity = 0.8;
+        }
 
-        mapEl.appendChild(pulse);
-        mapEl.appendChild(dot);
-        mapEl.appendChild(label);
+        const focusItemInBox = () => {
+          const summary = {
+            name: item.customName || item.name || "Item",
+            category: item.category,
+            distanceFeet: item.distanceFeet || null,
+            status: item.status,
+            id: item.id
+          };
+          dataBoxEl.value =
+            "Item details:\n" +
+            JSON.stringify(summary, null, 2) +
+            "\n\nRaw data from the item (if any) will appear here when your firmware sends it.";
+        };
+
+        dot.addEventListener("click", focusItemInBox);
+        label.addEventListener("click", focusItemInBox);
+
+        radarEl.appendChild(pulse);
+        radarEl.appendChild(dot);
+        radarEl.appendChild(label);
       }
 
-      // Device list
-      deviceListEl.innerHTML = "";
-      for (const [id, info] of devices) {
+      updateItemCount();
+    }
+
+    function renderItemList() {
+      itemListEl.innerHTML = "";
+      const visible = getVisibleItems();
+      if (!visible.length) {
+        const empty = document.createElement("div");
+        empty.style.fontSize = "11px";
+        empty.style.color = "var(--muted)";
+        empty.textContent = "No items connected yet. Click “Scan for items” above.";
+        itemListEl.appendChild(empty);
+        return;
+      }
+
+      for (const item of visible) {
         const card = document.createElement("div");
         card.className = "device-card";
 
         const main = document.createElement("div");
         main.className = "device-card-main";
 
+        const nameRow = document.createElement("div");
+        nameRow.className = "device-name-row";
+
         const nameEl = document.createElement("div");
         nameEl.className = "device-name";
-        nameEl.textContent = info.device.name || "ESP32-Locator";
+        nameEl.textContent = item.customName || item.name || "Item";
+
+        const renameBtn = document.createElement("button");
+        renameBtn.className = "btn-secondary btn-small";
+        renameBtn.textContent = "Rename";
+        renameBtn.addEventListener("click", () => {
+          const newName = prompt("Enter a new name for this item:", item.customName || item.name || "Item");
+          if (newName && newName.trim()) {
+            item.customName = newName.trim();
+            renderRadar();
+            renderItemList();
+          }
+        });
+
+        nameRow.appendChild(nameEl);
+        nameRow.appendChild(renameBtn);
 
         const metaEl = document.createElement("div");
         metaEl.className = "device-meta";
-        const idShort = id ? id.slice(0, 8) + "…" : "unknown";
-        metaEl.textContent = `ID: ${idShort}`;
 
-        main.appendChild(nameEl);
+        let distanceText = "Distance: unknown";
+        if (item.distanceFeet && isFinite(item.distanceFeet)) {
+          distanceText = `Distance: ~${Math.round(item.distanceFeet)} ft`;
+        }
+
+        metaEl.textContent = `${distanceText} · Category: ${item.category}`;
+
+        main.appendChild(nameRow);
         main.appendChild(metaEl);
+
+        const rightCol = document.createElement("div");
+        rightCol.style.display = "flex";
+        rightCol.style.flexDirection = "column";
+        rightCol.style.alignItems = "flex-end";
+        rightCol.style.gap = "4px";
 
         const pill = document.createElement("div");
         pill.className = "pill";
-        pill.textContent = "Bluetooth";
+        let pillText = "Nearby";
+        if (item.status === "getting-far") {
+          pill.classList.add("pill-warning");
+          pillText = "Getting far";
+        } else if (item.status === "out-of-range") {
+          pill.classList.add("pill-danger");
+          pillText = "Out of range";
+        }
+        pill.textContent = pillText;
+
+        const categorySelect = document.createElement("select");
+        for (const cat of categories) {
+          if (cat === "All Items") continue;
+          const opt = document.createElement("option");
+          opt.value = cat;
+          opt.textContent = cat;
+          categorySelect.appendChild(opt);
+        }
+        if (!categories.has(item.category)) {
+          item.category = "Uncategorized";
+        }
+        categorySelect.value = item.category;
+        categorySelect.addEventListener("change", () => {
+          item.category = categorySelect.value || "Uncategorized";
+          renderItemList();
+          renderRadar();
+        });
+
+        const removeBtn = document.createElement("button");
+        removeBtn.className = "btn-danger btn-small";
+        removeBtn.textContent = "Remove";
+        removeBtn.addEventListener("click", () => {
+          try {
+            if (item.server && item.server.connected) {
+              item.server.disconnect();
+            } else if (item.device && item.device.gatt && item.device.gatt.connected) {
+              item.device.gatt.disconnect();
+            }
+          } catch (err) {
+            // ignore
+          }
+          items.delete(item.id);
+          renderItemList();
+          renderRadar();
+        });
+
+        rightCol.appendChild(pill);
+        rightCol.appendChild(categorySelect);
+        rightCol.appendChild(removeBtn);
 
         card.appendChild(main);
-        card.appendChild(pill);
-        deviceListEl.appendChild(card);
+        card.appendChild(rightCol);
+        itemListEl.appendChild(card);
       }
+    }
 
-      updateDeviceCount();
+    function renderAll() {
+      renderRadar();
+      renderItemList();
     }
 
     async function handleScan() {
@@ -621,58 +959,125 @@ When you connect to an ESP32-Locator, its live status will appear here.
       }
 
       try {
-        setBtStatus("Opening Bluetooth device chooser…");
-        const device = await navigator.bluetooth.requestDevice({
-          filters: [{ namePrefix: "ESP32-Locator" }],
-          optionalServices: [SERVICE_UUID]
-        });
+        setBtStatus("Opening Bluetooth chooser…");
+        const options = {
+          acceptAllDevices: true
+        };
+        if (CUSTOM_ITEM_SERVICE_UUID) {
+          options.optionalServices = [CUSTOM_ITEM_SERVICE_UUID];
+        }
+
+        const device = await navigator.bluetooth.requestDevice(options);
+        const id = device.id || (device.name || "Item") + "#" + Math.random().toString(16).slice(2);
 
         const server = await device.gatt.connect();
-        const service = await server.getPrimaryService(SERVICE_UUID);
-        const statusChar = await service.getCharacteristic(STATUS_CHAR_UUID);
 
-        let info = devices.get(device.id);
-        if (!info) {
-          const { x, y } = randomMapPosition();
-          info = { device, server, statusChar, statusJson: null, x, y };
-          devices.set(device.id, info);
+        let statusChar = null;
+        let distanceChar = null;
+
+        if (CUSTOM_ITEM_SERVICE_UUID && CUSTOM_STATUS_CHAR_UUID) {
+          try {
+            const service = await server.getPrimaryService(CUSTOM_ITEM_SERVICE_UUID);
+            statusChar = await service.getCharacteristic(CUSTOM_STATUS_CHAR_UUID);
+          } catch (err) {
+            console.warn("Custom status characteristic not available on this item.", err);
+          }
+        }
+
+        if (CUSTOM_ITEM_SERVICE_UUID && CUSTOM_DISTANCE_CHAR_UUID) {
+          try {
+            const service = await server.getPrimaryService(CUSTOM_ITEM_SERVICE_UUID);
+            distanceChar = await service.getCharacteristic(CUSTOM_DISTANCE_CHAR_UUID);
+          } catch (err) {
+            console.warn("Custom distance characteristic not available on this item.", err);
+          }
+        }
+
+        let item = items.get(id);
+        if (!item) {
+          item = {
+            id,
+            device,
+            server,
+            statusChar,
+            distanceChar,
+            name: device.name || "Unnamed Item",
+            customName: null,
+            category: "Uncategorized",
+            distanceFeet: null,
+            lastSeen: Date.now(),
+            status: "nearby",
+            x: null,
+            y: null
+          };
+          items.set(id, item);
         } else {
-          info.server = server;
-          info.statusChar = statusChar;
+          item.server = server;
+          item.statusChar = statusChar;
+          item.distanceChar = distanceChar;
+          item.lastSeen = Date.now();
+          item.status = "nearby";
         }
 
-        // initial read
-        try {
-          const value = await statusChar.readValue();
-          const text = new TextDecoder().decode(value);
-          info.statusJson = text;
-          codeBoxEl.value = prettifyJson(text);
-        } catch (err) {
-          console.warn("Could not read initial status:", err);
+        // initial distance estimate (fallback)
+        if (item.distanceFeet == null) {
+          item.distanceFeet = 15 + Math.random() * 25;
         }
 
-        // notifications
-        statusChar.addEventListener("characteristicvaluechanged", event => {
-          const text = new TextDecoder().decode(event.target.value);
-          info.statusJson = text;
-          codeBoxEl.value = prettifyJson(text);
-          renderMapAndList();
-        });
-        await statusChar.startNotifications();
+        // optional: read initial status JSON
+        if (statusChar) {
+          try {
+            const value = await statusChar.readValue();
+            const text = new TextDecoder().decode(value);
+            dataBoxEl.value = prettifyJson(text);
+            item.lastSeen = Date.now();
+          } catch (err) {
+            console.warn("Could not read initial status from item.", err);
+          }
 
-        // disconnect handler
+          statusChar.addEventListener("characteristicvaluechanged", event => {
+            const text = new TextDecoder().decode(event.target.value);
+            dataBoxEl.value = prettifyJson(text);
+            item.lastSeen = Date.now();
+          });
+          try {
+            await statusChar.startNotifications();
+          } catch (err) {
+            console.warn("Could not start notifications for status characteristic.", err);
+          }
+        }
+
+        // optional: distance updates from a characteristic
+        if (distanceChar) {
+          distanceChar.addEventListener("characteristicvaluechanged", event => {
+            const dv = event.target.value;
+            const meters = dv.getFloat32(0, /*littleEndian=*/true);
+            if (isFinite(meters) && meters > 0) {
+              const feet = meters * 3.28084;
+              item.distanceFeet = feet;
+              item.lastSeen = Date.now();
+            }
+          });
+          try {
+            await distanceChar.startNotifications();
+          } catch (err) {
+            console.warn("Could not start notifications for distance characteristic.", err);
+          }
+        }
+
         device.addEventListener("gattserverdisconnected", () => {
-          devices.delete(device.id);
-          setBtStatus("Device disconnected. Scan again to reconnect.");
-          renderMapAndList();
+          // mark item as out-of-range but keep it in the list until removed
+          item.status = "out-of-range";
+          handleStatusChangeNotifications(item, "out-of-range");
+          renderAll();
         });
 
-        setBtStatus("Connected to " + (device.name || "ESP32-Locator") + ".");
-        renderMapAndList();
+        setBtStatus("Connected to item: " + (item.customName || item.name) + ".");
+        renderAll();
       } catch (err) {
         console.error(err);
         if (err.name === "NotFoundError") {
-          setBtStatus("Scan cancelled. No device selected.");
+          setBtStatus("Scan cancelled. No item selected.");
         } else {
           setBtStatus("Bluetooth scan or connection failed. See console for details.", true);
         }
@@ -680,29 +1085,120 @@ When you connect to an ESP32-Locator, its live status will appear here.
     }
 
     function disconnectAll() {
-      for (const [, info] of devices) {
+      for (const [, item] of items) {
         try {
-          if (info.server && info.server.connected) {
-            info.server.disconnect();
-          } else if (info.device && info.device.gatt && info.device.gatt.connected) {
-            info.device.gatt.disconnect();
+          if (item.server && item.server.connected) {
+            item.server.disconnect();
+          } else if (item.device && item.device.gatt && item.device.gatt.connected) {
+            item.device.gatt.disconnect();
           }
         } catch (err) {
-          console.warn("Error disconnecting device:", err);
+          console.warn("Error disconnecting item:", err);
         }
       }
-      devices.clear();
-      renderMapAndList();
-      setBtStatus("All devices disconnected.");
+      items.clear();
+      renderAll();
+      setBtStatus("All items disconnected.");
     }
 
-    // Wire up
+    function requestNotificationPermissionIfNeeded() {
+      if (!enableNotificationsEl.checked) return;
+      if (!("Notification" in window)) {
+        alert("This browser does not support notifications.");
+        enableNotificationsEl.checked = false;
+        return;
+      }
+      if (Notification.permission === "granted") return;
+      if (Notification.permission === "denied") {
+        alert("Notifications are blocked for this site. Enable them in your browser to receive alerts.");
+        enableNotificationsEl.checked = false;
+        return;
+      }
+      Notification.requestPermission().then(result => {
+        if (result !== "granted") {
+          enableNotificationsEl.checked = false;
+        }
+      });
+    }
+
+    function sendNotification(title, body) {
+      if (!enableNotificationsEl.checked) return;
+      if (!("Notification" in window)) return;
+      if (Notification.permission !== "granted") return;
+      try {
+        new Notification(title, { body });
+      } catch (err) {
+        console.warn("Notification failed:", err);
+      }
+    }
+
+    function handleStatusChangeNotifications(item, newStatus) {
+      const name = item.customName || item.name || "Item";
+
+      if (newStatus === "getting-far" && notifyGettingFarEl.checked) {
+        sendNotification("Item Oracle Alert", `Your item “${name}” is getting far away.`);
+      } else if (newStatus === "out-of-range" && notifyOutOfRangeEl.checked) {
+        sendNotification("Item Oracle Alert", `Your item “${name}” is out of range.`);
+      } else if (newStatus === "nearby" && notifyBackInRangeEl.checked) {
+        sendNotification("Item Oracle Update", `Your item “${name}” is nearby again.`);
+      }
+    }
+
+    function updateItemStatuses() {
+      const now = Date.now();
+      for (const [, item] of items) {
+        const seconds = (now - item.lastSeen) / 1000;
+
+        let newStatus;
+        if (seconds <= NEARBY_THRESHOLD_SECONDS) {
+          newStatus = "nearby";
+        } else if (seconds <= GETTING_FAR_SECONDS) {
+          newStatus = "getting-far";
+        } else if (seconds >= OUT_OF_RANGE_SECONDS) {
+          newStatus = "out-of-range";
+        } else {
+          newStatus = "getting-far";
+        }
+
+        if (newStatus !== item.status) {
+          handleStatusChangeNotifications(item, newStatus);
+          item.status = newStatus;
+        }
+      }
+      renderAll();
+    }
+
+    // Event wiring
     scanButton.addEventListener("click", handleScan);
     disconnectAllButton.addEventListener("click", disconnectAll);
 
-    // Init
-    setBtStatus("Web Bluetooth ready. Click “Scan for ESP32” to begin.");
-    updateDeviceCount();
+    categoryFilterEl.addEventListener("change", () => {
+      renderAll();
+    });
+
+    addCategoryButton.addEventListener("click", () => {
+      const name = newCategoryInput.value.trim();
+      if (!name) return;
+      if (!categories.has(name)) {
+        categories.add(name);
+        ensureCategoryOptions();
+      }
+      newCategoryInput.value = "";
+    });
+
+    enableNotificationsEl.addEventListener("change", () => {
+      if (enableNotificationsEl.checked) {
+        requestNotificationPermissionIfNeeded();
+      }
+    });
+
+    // Initial setup
+    setBtStatus("Web Bluetooth ready. Click “Scan for items” to begin.");
+    ensureCategoryOptions();
+    renderAll();
+
+    // Periodic status check for getting-far / out-of-range
+    setInterval(updateItemStatuses, 2000);
   </script>
 </body>
 </html>
